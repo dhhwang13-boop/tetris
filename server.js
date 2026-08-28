@@ -8,8 +8,9 @@ const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // ---------- 정적 파일 서버 ----------
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const server = http.createServer((req, res) => {
+  if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   let filePath = req.url === '/' ? '/index.html' : req.url;
   filePath = path.join(PUBLIC_DIR, path.normalize(filePath).replace(/^(\.\.[\/\\])+/, ''));
   fs.readFile(filePath, (err, data) => {
@@ -46,6 +47,7 @@ function lobbyPayload(room) {
   return {
     type: 'lobby',
     roomId: room.id,
+    title: room.title,
     hostId: room.hostId,
     isPrivate: room.isPrivate,
     players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready }))
@@ -68,8 +70,19 @@ function roomListPayload() {
 wss.on('connection', (ws) => {
   ws.playerId = null;
   ws.roomId = null;
+  ws.isAlive = true;
+  ws.msgCount = 0;
+  ws.msgWindowStart = Date.now();
+  ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
+    // 과도한 트래픽/악의적 클라이언트로부터 무료 서버 자원을 보호하기 위한 기본 방어
+    if (raw.length > 8000) return; // 비정상적으로 큰 페이로드 차단
+    const now = Date.now();
+    if (now - ws.msgWindowStart > 1000) { ws.msgWindowStart = now; ws.msgCount = 0; }
+    ws.msgCount++;
+    if (ws.msgCount > 40) return; // 초당 40개 초과 메시지는 조용히 무시 (도배 방지)
+
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
 
@@ -86,7 +99,7 @@ wss.on('connection', (ws) => {
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
       const title = String(msg.roomTitle || '').slice(0, 20) || null;
       const room = { id, title, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
-      room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: false, alive: true, score: 0, lines: 0 });
+      room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0 });
       rooms.set(id, room);
       ws.playerId = hostId; ws.roomId = id;
       send(ws, { type: 'created', roomId: id, playerId: hostId });
@@ -200,6 +213,23 @@ function checkEnd(room) {
     broadcast(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null });
   }
 }
+
+// 응답 없는 연결(비정상 종료 등)을 주기적으로 정리 - 방이 유령처럼 남는 것을 방지
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) { ws.terminate(); return; }
+    ws.isAlive = false;
+    try { ws.ping(); } catch (e) {}
+  });
+}, 30000);
+
+// 종료됐지만 정리되지 않은 방(빈 방, 오래된 종료 상태)을 주기적으로 청소 - 무료 서버 메모리 보호
+setInterval(() => {
+  for (const [id, room] of rooms) {
+    if (room.players.size === 0) { rooms.delete(id); continue; }
+    if (room.status === 'ended') { rooms.delete(id); continue; }
+  }
+}, 2 * 60 * 1000);
 
 server.listen(PORT, () => {
   console.log(`테트리스 배틀 서버 실행 중: http://localhost:${PORT}`);
