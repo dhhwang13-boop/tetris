@@ -11,6 +11,11 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg' };
 const server = http.createServer((req, res) => {
   if (req.url === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
+  if (req.url === '/stats') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify({ online: wss.clients.size }));
+    return;
+  }
   let filePath = req.url === '/' ? '/index.html' : req.url;
   filePath = path.join(PUBLIC_DIR, path.normalize(filePath).replace(/^(\.\.[\/\\])+/, ''));
   fs.readFile(filePath, (err, data) => {
