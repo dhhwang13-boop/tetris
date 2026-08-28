@@ -16,7 +16,10 @@ const server = http.createServer((req, res) => {
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
     const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+    // HTML은 항상 최신 버전을 받도록 캐시를 막음 (배포했는데 브라우저가 예전 버전을 계속 쓰는 문제 방지)
+    headers['Cache-Control'] = ext === '.html' ? 'no-cache, no-store, must-revalidate' : 'public, max-age=86400';
+    res.writeHead(200, headers);
     res.end(data);
   });
 });
