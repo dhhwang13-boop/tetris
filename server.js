@@ -56,6 +56,7 @@ function roomListPayload() {
     .filter(r => r.status === 'lobby' && r.players.size < 4)
     .map(r => ({
       roomId: r.id,
+      title: r.title || null,
       hostName: (r.players.get(r.hostId) || {}).name || '플레이어',
       count: r.players.size,
       max: 4,
@@ -83,7 +84,8 @@ wss.on('connection', (ws) => {
       const isPrivate = !!msg.isPrivate;
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
-      const room = { id, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
+      const title = String(msg.roomTitle || '').slice(0, 20) || null;
+      const room = { id, title, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
       room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: false, alive: true, score: 0, lines: 0 });
       rooms.set(id, room);
       ws.playerId = hostId; ws.roomId = id;
@@ -160,6 +162,13 @@ wss.on('connection', (ws) => {
       if (aliveOthers.length === 0) return;
       const [targetId, targetP] = aliveOthers[Math.floor(Math.random() * aliveOthers.length)];
       send(targetP.ws, { type: 'garbage', amount: msg.amount, from: me.name });
+      return;
+    }
+
+    if (msg.type === 'chat') {
+      const text = String(msg.text || '').slice(0, 80);
+      if (!text) return;
+      broadcast(room, { type: 'chat', id: ws.playerId, name: me.name, text, isEmoji: !!msg.isEmoji }, ws.playerId);
       return;
     }
   });
