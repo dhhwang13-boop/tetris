@@ -810,7 +810,7 @@ document.addEventListener('click', function firstInteractionPlay(){
   if(!gameBgmStarted && id==='screen-game') startGameBgmPlayback();
 }, { once:false });
 
-// ---------- 효과음 (틱 / 줄삭제 타격감, Web Audio로 직접 합성) ----------
+// ---------- 효과음 (틱 / 블록배치 / 줄삭제, Web Audio) ----------
 let sfxCtx = null, sfxMaster = null;
 function ensureSfxCtx(){
   if(!sfxCtx){
@@ -822,6 +822,7 @@ function ensureSfxCtx(){
     sfxMaster.attack.setValueAtTime(0.003, sfxCtx.currentTime);
     sfxMaster.release.setValueAtTime(0.15, sfxCtx.currentTime);
     sfxMaster.connect(sfxCtx.destination);
+    loadLineClearBuffer();
   }
   if(sfxCtx.state === 'suspended') sfxCtx.resume().catch(()=>{});
   return sfxCtx;
@@ -844,16 +845,12 @@ function playTick(){
   osc.connect(gain); gain.connect(sfxMaster);
   osc.start(t); osc.stop(t+0.05);
 }
-const LINE_CLEAR_TIERS = {
-  1: { freqStart:300, freqEnd:170, peak:0.20, dur:0.14, noise:0 },
-  2: { freqStart:220, freqEnd:90,  peak:0.30, dur:0.20, noise:0.10 },
-  3: { freqStart:160, freqEnd:55,  peak:0.38, dur:0.30, noise:0.18 },
-};
-function playLineClear(tier){
+// 블록을 스페이스(하드드롭)로 놓을 때 나는 합성 타격음
+function playBlockPlace(){
   if(sfxGain()<=0) return;
   const ctx = ensureSfxCtx();
   const t = ctx.currentTime;
-  const cfg = LINE_CLEAR_TIERS[tier] || LINE_CLEAR_TIERS[1];
+  const cfg = { freqStart:210, freqEnd:85, peak:0.28, dur:0.16, noise:0.10 };
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = 'sine';
@@ -864,26 +861,42 @@ function playLineClear(tier){
   gain.gain.exponentialRampToValueAtTime(0.0001, t+cfg.dur);
   osc.connect(gain); gain.connect(sfxMaster);
   osc.start(t); osc.stop(t+cfg.dur+0.02);
-  if(cfg.noise>0){
-    const bufferSize = Math.floor(ctx.sampleRate * cfg.dur);
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(2500, t);
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(cfg.noise*sfxGain(), t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, t+cfg.dur*0.6);
-    noise.connect(filter); filter.connect(noiseGain); noiseGain.connect(sfxMaster);
-    noise.start(t);
-  }
+  const bufferSize = Math.floor(ctx.sampleRate * cfg.dur);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(2500, t);
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(cfg.noise*sfxGain(), t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, t+cfg.dur*0.6);
+  noise.connect(filter); filter.connect(noiseGain); noiseGain.connect(sfxMaster);
+  noise.start(t);
 }
+// 줄삭제 효과음 (첨부 샘플, 지운 줄 수에 따라 볼륨 차등)
+let lineClearBuffer = null;
+function loadLineClearBuffer(){
+  fetch('assets/line-clear.mp3')
+    .then(r=>r.arrayBuffer())
+    .then(buf=>sfxCtx.decodeAudioData(buf))
+    .then(decoded=>{ lineClearBuffer = decoded; })
+    .catch(()=>{});
+}
+const LINE_CLEAR_VOLUME_TIERS = { 1:0.45, 2:0.75, 3:1.0 };
 function playLineClearForCount(n){
-  if(n<=0) return;
-  playLineClear(n<=2 ? 1 : (n<=4 ? 2 : 3));
+  if(n<=0 || sfxGain()<=0) return;
+  const ctx = ensureSfxCtx();
+  if(!lineClearBuffer) return;
+  const tier = n<=2 ? 1 : (n<=4 ? 2 : 3);
+  const src = ctx.createBufferSource();
+  src.buffer = lineClearBuffer;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(LINE_CLEAR_VOLUME_TIERS[tier]*sfxGain(), ctx.currentTime);
+  src.connect(gain); gain.connect(sfxMaster);
+  src.start();
 }
 
 // ---------- 화면 전환 ----------
@@ -1530,7 +1543,7 @@ function onKeyDown(e){
     case 'ArrowUp': tryRotate(eng,1); renderAll(); break;
     case 'z': case 'Z': tryRotate(eng,-1); renderAll(); break;
     case 'c': case 'C': case 'Shift': holdPiece(eng); renderAll(); break;
-    case ' ': { const cleared = hardDrop(eng); onLinesCleared(cleared); } renderAll(); checkGameOver(); break;
+    case ' ': { const cleared = hardDrop(eng); playBlockPlace(); onLinesCleared(cleared); } renderAll(); checkGameOver(); break;
   }
 }
 function onKeyUp(e){
