@@ -33,7 +33,7 @@
   .screen.active{ display:flex; }
 
   /* ---------- 메인 메뉴 ---------- */
-  #screen-menu{ flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  #screen-menu{ flex-direction:column; align-items:center; justify-content:center; gap:8px; position:relative; }
   .logo{
     font-size:64px; font-weight:900; letter-spacing:7px; margin:0;
     background: linear-gradient(90deg, var(--cyan), var(--pink), var(--yellow), var(--green));
@@ -63,12 +63,53 @@
   }
   .menu-btn.primary .badge{ color:var(--cyan); }
   .menu-btn.disabled .badge{ color:var(--dim); }
+  .menu-side-col{ display:flex; flex-direction:column; gap:10px; width:150px; }
   .shop-btn{
-    width:150px; background:var(--panel2); border:2px dashed var(--yellow); border-radius:20px;
-    display:flex; align-items:center; justify-content:center; cursor:not-allowed; pointer-events:none;
+    flex:1; background:var(--panel2); border:2px dashed var(--yellow); border-radius:16px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .1s ease, border-color .15s ease;
   }
-  .shop-btn svg{ width:44px; height:44px; }
+  .shop-btn:hover{ transform:translateY(-1px); border-color:var(--cyan); }
+  .shop-btn svg{ width:36px; height:36px; }
+  .rank-btn{
+    flex:1; background:var(--panel2); border:2px dashed var(--cyan); border-radius:16px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .1s ease, border-color .15s ease;
+  }
+  .rank-btn:hover{ transform:translateY(-1px); border-color:var(--pink); }
+  .rank-btn svg{ width:32px; height:32px; }
+  .rank-section{ margin-top:16px; }
+  .rank-section-label{ font-size:11px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
+  .rank-value{ font-weight:900; color:var(--yellow); }
+  .menu-coin-display{
+    margin-top:14px; background:var(--panel2); border:1px solid var(--line); border-radius:20px;
+    padding:6px 16px; font-size:13px; font-weight:700; color:var(--yellow);
+  }
+  .mp-nick-line{ font-size:12px; color:var(--dim); margin-bottom:16px; }
+  .mp-nick-line b{ color:var(--text); }
+  .mp-nick-change{ color:var(--cyan); cursor:pointer; text-decoration:underline; }
+  .coin-badge{ background:var(--panel2); border:1px solid var(--line); border-radius:20px; padding:6px 14px; font-size:13px; font-weight:700; color:var(--yellow); }
+  .shop-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .shop-item{ background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:14px 10px; text-align:center; }
+  .shop-swatch{ width:100%; height:56px; border-radius:8px; margin-bottom:8px; position:relative; overflow:hidden; }
+  .shop-swatch .wave{ position:absolute; inset:0; background:linear-gradient(120deg, transparent 0%, rgba(255,255,255,.4) 45%, transparent 60%); animation: waveSlide 2.2s linear infinite; }
+  @keyframes waveSlide{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(100%);} }
+  .shop-item-name{ font-size:12px; font-weight:700; margin-bottom:4px; }
+  .shop-item-price{ font-size:11px; color:var(--dim); margin-bottom:8px; }
+  .shop-btn-buy{ width:100%; font-family:inherit; padding:8px; border-radius:6px; border:none; cursor:pointer; font-size:11px; font-weight:700; }
+  .shop-btn-buy.buy{ background:linear-gradient(90deg,var(--cyan),#7fe8ff); color:#00303c; }
+  .shop-btn-buy.equip{ background:var(--panel); border:1px solid var(--line); color:var(--text); }
+  .shop-btn-buy.equipped{ background:rgba(82,255,157,.15); color:var(--good); border:1px solid var(--good); cursor:default; }
+  .shop-msg{ color:var(--bad); font-size:12px; text-align:center; margin-top:12px; min-height:14px; }
   .menu-foot{ color:var(--dim); font-size:11px; margin-top:26px; text-align:center; line-height:1.7; max-width:340px; }
+  .dev-badge{
+    position:fixed; bottom:20px; right:20px; display:flex; align-items:center; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:7px 16px 7px 7px;
+  }
+  .dev-badge img{ width:38px; height:38px; border-radius:8px; object-fit:cover; display:block; }
+  .dev-badge-label{ font-size:9px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; }
+  .dev-badge-name{
+    font-size:16px; font-weight:900; line-height:1.3;
+    background:linear-gradient(90deg, var(--cyan), var(--pink)); -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
 
   /* ---------- 게임 화면 ---------- */
   #screen-game{ align-items:center; justify-content:center; }
@@ -80,12 +121,12 @@
   .left-col.mp-mode{ height:608px; }
   .chat-panel{ flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; position:relative; }
   .chat-log{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
-  .chat-line{ font-size:10.5px; line-height:1.4; color:var(--text); word-break:break-word; }
+  .chat-line{ font-size:12.5px; line-height:1.5; color:var(--text); word-break:break-word; }
   .chat-line b{ color:var(--cyan); font-weight:700; margin-right:3px; }
   .chat-input-row{ display:flex; gap:5px; }
   .chat-input-row input[type=text]{
     flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text);
-    padding:7px 8px; border-radius:6px; font-family:inherit; font-size:11px; outline:none;
+    padding:7px 8px; border-radius:6px; font-family:inherit; font-size:12.5px; outline:none;
   }
   .chat-input-row input[type=text]:focus{ border-color:var(--cyan); }
   .chat-emoji-btn{
@@ -99,9 +140,9 @@
   .chat-emoji-opt{ font-size:20px; background:none; border:none; cursor:pointer; padding:2px 4px; border-radius:6px; }
   .chat-emoji-opt:hover{ background:var(--bg); }
   .opp-speech-bubble{
-    position:absolute; top:-6px; right:6px; background:#fff; color:#111; font-size:15px;
-    border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center;
-    box-shadow:0 2px 6px rgba(0,0,0,.4); animation: bubblePop .2s ease; z-index:6;
+    position:absolute; top:-14px; right:-8px; background:#fff; color:#111; font-size:26px;
+    border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 10px rgba(0,0,0,.5); animation: bubblePop .2s ease; z-index:6;
   }
   @keyframes bubblePop{ from{ transform:scale(0.4); opacity:0; } to{ transform:scale(1); opacity:1; } }
   .right-col{ display:flex; flex-direction:column; gap:14px; width:130px; }
@@ -139,7 +180,7 @@
   .ov-btn.ghost{ background:var(--panel2); color:var(--text); border:1px solid var(--line); }
 
   /* ---------- 멀티플레이 ---------- */
-  #screen-mp-login, #screen-mp-create, #screen-mp-join, #screen-mp-lobby{ align-items:center; justify-content:center; }
+  #screen-mp-login, #screen-mp-create, #screen-mp-join, #screen-mp-lobby, #screen-shop, #screen-rank, #screen-nickname{ align-items:center; justify-content:center; }
   .mp-card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; width:360px; }
   .mp-card label{ display:block; font-size:11px; color:var(--dim); letter-spacing:1px; margin:14px 0 6px; text-transform:uppercase; }
   .mp-card label:first-of-type{ margin-top:0; }
@@ -222,7 +263,18 @@
 <body>
 
 <!-- ================= 메인 메뉴 ================= -->
-<div class="screen active" id="screen-menu">
+<!-- ================= 최초 실행 닉네임 설정 ================= -->
+<div class="screen active" id="screen-nickname">
+  <div class="mp-card" style="width:400px;">
+    <div class="mp-title">닉네임을 정해주세요</div>
+    <div class="mp-sub" style="text-align:left; margin:6px 0 14px;">한 번 정하면 계속 사용돼요. 나중에 다시 바꿀 수 있어요.</div>
+    <input type="text" id="nickname-input" maxlength="8" placeholder="예: 홍길동">
+    <div class="mp-err" id="nickname-err"></div>
+    <button class="ov-btn main" id="nickname-confirm" style="width:100%; margin-top:16px;">시작하기</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-menu">
   <h1 class="logo">TETRIS BATTLE</h1>
   <div class="logo-sub">Desktop Edition</div>
   <div class="menu-row">
@@ -230,24 +282,72 @@
       <button class="menu-btn primary" id="btn-single">싱글플레이<span class="badge">MARATHON</span></button>
       <button class="menu-btn primary" id="btn-multi">멀티플레이<span class="badge">ONLINE</span></button>
     </div>
-    <div class="shop-btn" id="btn-shop" aria-disabled="true" title="상점 (준비중)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#ffce45" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="9" cy="20" r="1.4" fill="#ffce45" stroke="none"></circle>
-        <circle cx="17" cy="20" r="1.4" fill="#ffce45" stroke="none"></circle>
-        <path d="M2.5 3h2l2.2 11.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 7H6"></path>
-      </svg>
+    <div class="menu-side-col">
+      <div class="shop-btn" id="btn-shop" title="상점">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ffce45" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="20" r="1.4" fill="#ffce45" stroke="none"></circle>
+          <circle cx="17" cy="20" r="1.4" fill="#ffce45" stroke="none"></circle>
+          <path d="M2.5 3h2l2.2 11.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 7H6"></path>
+        </svg>
+      </div>
+      <div class="rank-btn" id="btn-rank" title="랭킹">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#3ddbff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6" y1="3" x2="6" y2="21"></line>
+          <line x1="18" y1="3" x2="18" y2="21"></line>
+          <line x1="6" y1="7" x2="18" y2="7"></line>
+          <line x1="6" y1="12" x2="18" y2="12"></line>
+          <line x1="6" y1="17" x2="18" y2="17"></line>
+        </svg>
+      </div>
     </div>
   </div>
+  <div class="menu-coin-display" id="menu-coin-display">🪙 <span id="menu-coin-count">0</span></div>
   <div class="menu-foot">전 세계 어디서든 방을 만들거나 참여할 수 있어요.</div>
+
+  <div class="dev-badge">
+    <img src="assets/dev-avatar.png" alt="developer">
+    <div>
+      <div class="dev-badge-label">Game Developer</div>
+      <div class="dev-badge-name">amumu</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 랭크(개인 기록) ================= -->
+<div class="screen" id="screen-rank">
+  <div class="mp-card" style="width:420px;">
+    <div class="mp-title">나의 기록</div>
+    <div class="rank-section">
+      <div class="rank-section-label">싱글플레이 최고점수</div>
+      <div class="rank-row"><span class="place">1위</span><span id="rank-sp-name"></span><span id="rank-sp-score" class="rank-value"></span></div>
+    </div>
+    <div class="rank-section">
+      <div class="rank-section-label">멀티플레이 전적</div>
+      <div class="rank-row"><span class="place">1위</span><span id="rank-mp-name"></span><span id="rank-mp-record" class="rank-value"></span></div>
+    </div>
+    <button class="ov-btn ghost" id="rank-back" style="width:100%; margin-top:16px;">← 메뉴로</button>
+  </div>
+</div>
+
+<!-- ================= 상점 ================= -->
+<div class="screen" id="screen-shop">
+  <div class="mp-card" style="width:660px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="mp-title" style="margin:0;">상점</div>
+      <div class="coin-badge">🪙 <span id="shop-coin-count">0</span></div>
+    </div>
+    <div class="mp-sub" style="text-align:left; margin:8px 0 16px;">블록 색상 이펙트를 구매하고 장착해보세요 (개당 10코인). 멀티플레이에서 이기면 코인을 얻어요.</div>
+    <div class="shop-grid" id="shop-grid"></div>
+    <div class="shop-msg" id="shop-msg"></div>
+    <button class="ov-btn ghost" id="shop-back" style="width:100%; margin-top:16px;">← 메뉴로</button>
+  </div>
 </div>
 
 <!-- ================= 멀티플레이 진입 메뉴 ================= -->
 <div class="screen" id="screen-mp-login">
   <div class="mp-card" style="width:440px;">
     <div class="mp-title">온라인 멀티플레이</div>
-    <label>닉네임</label>
-    <input type="text" id="mp-name" maxlength="8" placeholder="예: 홍길동">
-    <label style="display:none;">서버 주소</label>
+    <div class="mp-nick-line">닉네임: <b id="mp-login-nick"></b> · <span class="mp-nick-change" id="mp-nick-change-link">변경</span></div>
     <input type="text" id="mp-server" style="display:none;" placeholder="wss://your-server.onrender.com" value="wss://tetris-ym3c.onrender.com">
 
     <div class="mp-choice-row">
@@ -331,7 +431,7 @@
 <!-- ================= 게임 화면 (싱글플레이 / 멀티플레이 공용) ================= -->
 <div class="screen" id="screen-game">
   <div style="display:flex; flex-direction:column; align-items:center;">
-    <div class="topbar" id="game-topbar">
+    <div class="topbar" id="game-topbar" style="display:none;">
       <button id="btn-back-menu">← 메뉴</button>
       <button id="btn-pause">일시정지 (Esc)</button>
     </div>
@@ -435,8 +535,147 @@ function rotateCW(m){ const n=m.length; const r=Array.from({length:n},()=>Array(
 function rotateCCW(m){ const n=m.length; const r=Array.from({length:n},()=>Array(n).fill(0)); for(let y=0;y<n;y++) for(let x=0;x<n;x++) r[y][x]=m[x][n-1-y]; return r; }
 function bag7(){ const a=TYPES.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
+// ---------- 코인 & 상점 (로컬 저장, 기기별) ----------
+// 각 테트로미노 종류(I/O/T/S/Z/J/L)마다 독립적으로 구매/보유하는 색상 스킨
+const BLOCK_SKINS = [
+  {type:'I', name:'레드 I', color:'#ff4d5e'},
+  {type:'O', name:'오렌지 O', color:'#ff9d47'},
+  {type:'T', name:'옐로우 T', color:'#ffd93d'},
+  {type:'S', name:'그린 S', color:'#52ff9d'},
+  {type:'Z', name:'블루 Z', color:'#3ddbff'},
+  {type:'J', name:'인디고 J', color:'#4d6bff'},
+  {type:'L', name:'바이올렛 L', color:'#a855f7'},
+];
+const SKIN_PRICE = 10;
+function getCoins(){ return parseInt(localStorage.getItem('tb_coins')||'0',10) || 0; }
+function setCoins(n){ localStorage.setItem('tb_coins', String(Math.max(0,n))); }
+function addCoins(n){ setCoins(getCoins()+n); }
+function getOwnedSkins(){ try{ return JSON.parse(localStorage.getItem('tb_owned_skins')||'[]'); }catch(e){ return []; } }
+function setOwnedSkins(arr){ localStorage.setItem('tb_owned_skins', JSON.stringify(arr)); }
+function hasSkin(type){ return getOwnedSkins().includes(type); }
+function effectiveColor(type){
+  if(hasSkin(type)){ const s = BLOCK_SKINS.find(b=>b.type===type); if(s) return s.color; }
+  return HEX[type];
+}
+function coinsForResult(rank, total){
+  const table = { 2:{1:1,2:0}, 3:{1:2,2:1,3:0}, 4:{1:4,2:2,3:0,4:0} };
+  const t = table[total] || {};
+  return t[rank] || 0;
+}
+function refreshMenuCoinDisplay(){
+  const el = document.getElementById('menu-coin-count');
+  if(el) el.textContent = getCoins();
+}
+let shopAnimId = null;
+function renderShop(){
+  document.getElementById('shop-coin-count').textContent = getCoins();
+  document.getElementById('shop-msg').textContent = '';
+  const grid = document.getElementById('shop-grid');
+  grid.innerHTML = '';
+  const owned = getOwnedSkins();
+  BLOCK_SKINS.forEach(s=>{
+    const isOwned = owned.includes(s.type);
+    const card = document.createElement('div');
+    card.className = 'shop-item';
+    card.innerHTML = `
+      <canvas class="shop-piece-canvas" width="72" height="72" data-type="${s.type}" data-color="${s.color}"></canvas>
+      <div class="shop-item-name">${s.name}</div>
+      <div class="shop-item-price">${isOwned ? '보유중' : SKIN_PRICE+' 코인'}</div>
+      <button class="shop-btn-buy ${isOwned?'equipped':'buy'}" data-type="${s.type}" ${isOwned?'disabled':''}>
+        ${isOwned ? '보유중' : '구매하기'}
+      </button>`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.shop-btn-buy:not([disabled])').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const type = btn.dataset.type;
+      if(hasSkin(type)) return;
+      if(getCoins() < SKIN_PRICE){ document.getElementById('shop-msg').textContent = '코인이 부족해요. 멀티플레이에서 이겨서 코인을 모아보세요!'; return; }
+      addCoins(-SKIN_PRICE);
+      const owned2 = getOwnedSkins(); owned2.push(type); setOwnedSkins(owned2);
+      renderShop();
+      refreshMenuCoinDisplay();
+    });
+  });
+  startShopAnimation();
+}
+function startShopAnimation(){
+  stopShopAnimation();
+  function loop(){
+    document.querySelectorAll('.shop-piece-canvas').forEach(canvas=>{
+      const ctx = canvas.getContext('2d');
+      const type = canvas.dataset.type, color = canvas.dataset.color;
+      const m = SHAPES[type]; const n = m.length; const cell = Math.floor(64/n);
+      ctx.clearRect(0,0,72,72);
+      const offx = (72-n*cell)/2, offy = (72-n*cell)/2;
+      const t = performance.now()/450;
+      for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+        if(!m[r][c]) continue;
+        const phase = (c*0.7+r*0.4)+t;
+        ctx.fillStyle = shadeHex(color, 0.75+0.35*Math.sin(phase));
+        ctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2);
+      }
+    });
+    shopAnimId = requestAnimationFrame(loop);
+  }
+  loop();
+}
+function stopShopAnimation(){ if(shopAnimId){ cancelAnimationFrame(shopAnimId); shopAnimId=null; } }
+document.getElementById('btn-shop').addEventListener('click', ()=>{ renderShop(); showScreen('screen-shop'); });
+document.getElementById('shop-back').addEventListener('click', ()=>{ stopShopAnimation(); showScreen('screen-menu'); });
+
+// ---------- 랭크(개인 기록) ----------
+function getBestScore(){ return parseInt(localStorage.getItem('tb_best_score')||'0',10) || 0; }
+function reportSingleScore(score){ if(score > getBestScore()) localStorage.setItem('tb_best_score', String(score)); }
+function getMpRecord(){
+  return {
+    wins: parseInt(localStorage.getItem('tb_mp_wins')||'0',10) || 0,
+    losses: parseInt(localStorage.getItem('tb_mp_losses')||'0',10) || 0,
+  };
+}
+function reportMpResult(won){
+  const key = won ? 'tb_mp_wins' : 'tb_mp_losses';
+  const cur = parseInt(localStorage.getItem(key)||'0',10) || 0;
+  localStorage.setItem(key, String(cur+1));
+}
+function renderRank(){
+  const name = getNickname() || '플레이어';
+  const best = getBestScore();
+  const { wins, losses } = getMpRecord();
+  const total = wins + losses;
+  const rate = total>0 ? Math.round(wins/total*100) : 0;
+  document.getElementById('rank-sp-name').textContent = name;
+  document.getElementById('rank-sp-score').textContent = best + '점';
+  document.getElementById('rank-mp-name').textContent = name;
+  document.getElementById('rank-mp-record').textContent = `${wins}승 (${rate}%)`;
+}
+document.getElementById('btn-rank').addEventListener('click', ()=>{ renderRank(); showScreen('screen-rank'); });
+document.getElementById('rank-back').addEventListener('click', ()=>{ showScreen('screen-menu'); });
+
 // ---------- 화면 전환 ----------
-function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id === 'screen-menu') refreshMenuCoinDisplay();
+}
+refreshMenuCoinDisplay();
+
+// ---------- 닉네임 (최초 1회 설정, 이후 계속 사용) ----------
+function getNickname(){ return localStorage.getItem('tb_nickname') || ''; }
+function setNickname(n){ localStorage.setItem('tb_nickname', n); }
+function goNicknameSetup(){
+  document.getElementById('nickname-input').value = getNickname();
+  document.getElementById('nickname-err').textContent = '';
+  showScreen('screen-nickname');
+}
+document.getElementById('nickname-confirm').addEventListener('click', ()=>{
+  const v = document.getElementById('nickname-input').value.trim();
+  if(!v){ document.getElementById('nickname-err').textContent = '닉네임을 입력해주세요.'; return; }
+  setNickname(v);
+  showScreen('screen-menu');
+});
+document.getElementById('mp-nick-change-link').addEventListener('click', goNicknameSetup);
+if(getNickname()){ showScreen('screen-menu'); } else { showScreen('screen-nickname'); }
 
 // 서버 주소 기억하기 (마지막으로 입력한 주소를 다음 실행 때도 유지)
 const DEFAULT_SERVER = 'wss://tetris-ym3c.onrender.com';
@@ -501,17 +740,11 @@ function mpHandleMessage(msg){
     case 'created':
       mpRoomId = msg.roomId; mpPlayerId = msg.playerId; mpIsHost = true;
       showScreen('screen-mp-lobby');
-      document.getElementById('mp-lobby-code').textContent = mpIsPrivateRoom ? mpMyPassword : mpRoomId;
-      document.getElementById('mp-lobby-sub').textContent = mpIsPrivateRoom
-        ? '비공개 방이에요. 위 코드를 아는 사람만 입장할 수 있어요.'
-        : '공개 방이에요. 참여 목록에서 누구나 찾아 입장할 수 있어요.';
       break;
     case 'joined':
       mpRoomId = msg.roomId; mpPlayerId = msg.playerId; mpIsHost = false;
       document.getElementById('mp-pw-modal').style.display = 'none';
       showScreen('screen-mp-lobby');
-      document.getElementById('mp-lobby-code').textContent = mpRoomId;
-      document.getElementById('mp-lobby-sub').textContent = '방에 입장했어요 (최대 4인)';
       break;
     case 'error':
       if(document.getElementById('mp-pw-modal').style.display === 'flex'){
@@ -536,14 +769,14 @@ function mpHandleMessage(msg){
 
 // ---- 화면 이동 (진입 메뉴 → 방 생성 / 방 참여) ----
 document.getElementById('mp-goto-create').addEventListener('click', ()=>{
-  const name = document.getElementById('mp-name').value.trim();
+  const name = getNickname();
   if(!name){ document.getElementById('mp-login-err').textContent = '닉네임을 입력해주세요.'; return; }
   document.getElementById('mp-login-err').textContent = '';
   document.getElementById('mp-create-err').textContent = '';
   showScreen('screen-mp-create');
 });
 document.getElementById('mp-goto-join').addEventListener('click', ()=>{
-  const name = document.getElementById('mp-name').value.trim();
+  const name = getNickname();
   if(!name){ document.getElementById('mp-login-err').textContent = '닉네임을 입력해주세요.'; return; }
   document.getElementById('mp-login-err').textContent = '';
   document.getElementById('mp-join-err').textContent = '';
@@ -561,7 +794,7 @@ document.querySelectorAll('input[name="mp-visibility"]').forEach(r=>{
 
 // ---- 방 생성 ----
 document.getElementById('mp-create-btn').addEventListener('click', ()=>{
-  const name = document.getElementById('mp-name').value.trim();
+  const name = getNickname();
   const server = document.getElementById('mp-server').value.trim();
   const roomTitle = document.getElementById('mp-room-title').value.trim();
   const isPrivate = document.querySelector('input[name="mp-visibility"]:checked').value === 'private';
@@ -606,7 +839,7 @@ function mpRenderRoomList(rooms){
   });
 }
 function mpTryJoinRoom(roomId, isPrivate){
-  const name = document.getElementById('mp-name').value.trim();
+  const name = getNickname();
   const err = document.getElementById('mp-join-err');
   if(!name){ err.textContent = '닉네임을 입력해주세요.'; return; }
   if(isPrivate){
@@ -616,13 +849,15 @@ function mpTryJoinRoom(roomId, isPrivate){
     document.getElementById('mp-pw-modal').style.display = 'flex';
     document.getElementById('mp-pw-input').focus();
   } else {
+    mpIsPrivateRoom = false; mpMyPassword = '';
     mpSend({type:'joinRoom', roomId, name});
   }
 }
 document.getElementById('mp-pw-confirm').addEventListener('click', ()=>{
-  const name = document.getElementById('mp-name').value.trim();
+  const name = getNickname();
   const password = document.getElementById('mp-pw-input').value.trim();
   if(!password){ document.getElementById('mp-pw-err').textContent = '코드를 입력해주세요.'; return; }
+  mpIsPrivateRoom = true; mpMyPassword = password;
   mpSend({type:'joinRoom', roomId: mpPendingJoinRoomId, password, name});
 });
 document.getElementById('mp-pw-cancel').addEventListener('click', ()=>{
@@ -631,13 +866,19 @@ document.getElementById('mp-pw-cancel').addEventListener('click', ()=>{
 });
 
 document.getElementById('btn-multi').addEventListener('click', ()=>{
+  document.getElementById('mp-login-nick').textContent = getNickname();
   showScreen('screen-mp-login');
 });
 document.getElementById('mp-login-back').addEventListener('click', ()=>{ mpDisconnect(); showScreen('screen-menu'); });
 
 function mpRenderLobby(msg){
   mpIsHost = (msg.hostId === mpPlayerId);
+  document.getElementById('mp-lobby-code').textContent = msg.title || msg.roomId;
+  document.getElementById('mp-lobby-sub').textContent = msg.isPrivate
+    ? (mpMyPassword ? `비공개 방이에요. 코드: ${mpMyPassword}` : '비공개 방이에요.')
+    : '공개 방이에요. 참여 목록에서 누구나 찾아 입장할 수 있어요.';
   document.getElementById('mp-start').style.display = mpIsHost ? 'block' : 'none';
+  document.getElementById('mp-ready').style.display = mpIsHost ? 'none' : 'block';
   const slotsEl = document.getElementById('mp-slots');
   slotsEl.innerHTML = '';
   for(let i=0;i<4;i++){
@@ -654,7 +895,7 @@ function mpRenderLobby(msg){
   const btnStart = document.getElementById('mp-start');
   const allReady = msg.players.length>=2 && msg.players.every(p=>p.ready);
   btnStart.disabled = !allReady;
-  btnStart.textContent = allReady ? '게임 시작 (호스트)' : `게임 시작 (전원 준비 필요, ${msg.players.filter(p=>p.ready).length}/${msg.players.length})`;
+  btnStart.textContent = allReady ? '게임 시작 (호스트)' : `게임 시작 (게스트 준비 필요, ${msg.players.filter(p=>p.ready).length}/${msg.players.length})`;
 }
 document.getElementById('mp-ready').addEventListener('click', (e)=>{
   const willReady = e.target.textContent.includes('완료');
@@ -717,9 +958,18 @@ function mpEndGame(ranking){
   clearInterval(mpStateTimer);
   running = false;
   if(rafId) cancelAnimationFrame(rafId);
+  if(eng) eng.gameOver = true;
+  document.removeEventListener('keydown', onKeyDown);
+  document.removeEventListener('keyup', onKeyUp);
+  const myRank = ranking.findIndex(r=>r.id===mpPlayerId) + 1;
+  const total = ranking.length;
+  const coinsWon = myRank>0 ? coinsForResult(myRank, total) : 0;
+  if(coinsWon>0) addCoins(coinsWon);
   const iWon = ranking.length>0 && ranking[0].id===mpPlayerId && ranking[0].alive;
+  reportMpResult(iWon);
   document.getElementById('mp-end-title').textContent = iWon ? '🏆 승리했습니다!' : '게임 종료';
-  document.getElementById('mp-end-sub').textContent = iWon ? '마지막까지 살아남았어요.' : '다음엔 더 잘할 수 있어요.';
+  document.getElementById('mp-end-sub').innerHTML = (iWon ? '마지막까지 살아남았어요.' : '다음엔 더 잘할 수 있어요.') +
+    (coinsWon>0 ? `<br><span style="color:var(--yellow); font-weight:700;">🪙 +${coinsWon} 코인 획득!</span>` : '');
   const listEl = document.getElementById('mp-rank-list');
   listEl.innerHTML = ranking.map((r,i)=>`<div class="rank-row"><span><span class="place">${i+1}위</span>${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''}</span><span>${r.score}점</span></div>`).join('');
   document.getElementById('overlay-mp-end').style.display = 'flex';
@@ -772,17 +1022,14 @@ function setLeftColLayout(isMulti){
   const holdPanel = document.getElementById('hold-panel');
   const statsPanel = document.getElementById('stats-panel');
   const chatPanel = document.getElementById('chat-panel');
-  const topbar = document.getElementById('game-topbar');
   left.classList.toggle('mp-mode', isMulti);
   if(isMulti){
     left.insertBefore(statsPanel, holdPanel);
     chatPanel.style.display = 'flex';
-    topbar.style.display = 'none';
     document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드';
   } else {
     left.insertBefore(holdPanel, statsPanel);
     chatPanel.style.display = 'none';
-    topbar.style.display = 'flex';
     document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 일시정지';
   }
 }
@@ -928,14 +1175,29 @@ const mainCanvas = document.getElementById('main-canvas'), mctx = mainCanvas.get
 const holdCanvas = document.getElementById('hold-canvas'), hctx = holdCanvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas'), nctx = nextCanvas.getContext('2d');
 
-function drawCell(ctx, cx, cy, color, cell, ghost){
+function shadeHex(hex, factor){
+  const c = hex.replace('#','');
+  const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+  const nr = Math.max(0,Math.min(255, Math.round(r*factor)));
+  const ng = Math.max(0,Math.min(255, Math.round(g*factor)));
+  const nb = Math.max(0,Math.min(255, Math.round(b*factor)));
+  return `rgb(${nr},${ng},${nb})`;
+}
+function drawCell(ctx, cx, cy, color, cell, ghost, wave){
   const px=cx*cell, py=cy*cell;
   if(ghost){
     ctx.strokeStyle = color; ctx.lineWidth = 2;
     ctx.strokeRect(px+2, py+2, cell-4, cell-4);
     return;
   }
-  ctx.fillStyle = color; ctx.fillRect(px+1, py+1, cell-2, cell-2);
+  let fillColor = color;
+  if(wave){
+    const t = performance.now()/450;
+    const phase = (cx*0.7 + cy*0.4) + t;
+    const factor = 0.75 + 0.35*Math.sin(phase);
+    fillColor = shadeHex(color, factor);
+  }
+  ctx.fillStyle = fillColor; ctx.fillRect(px+1, py+1, cell-2, cell-2);
   ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(px+1, py+1, cell-2, 4);
   ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(px+1, py+cell-5, cell-2, 4);
 }
@@ -945,20 +1207,31 @@ function drawBoard(){
   mctx.strokeStyle = 'rgba(255,255,255,0.04)';
   for(let x=0;x<=COLS;x++){ mctx.beginPath(); mctx.moveTo(x*CELL,0); mctx.lineTo(x*CELL,h); mctx.stroke(); }
   for(let y=0;y<=ROWS;y++){ mctx.beginPath(); mctx.moveTo(0,y*CELL); mctx.lineTo(w,y*CELL); mctx.stroke(); }
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ if(eng.board[r][c]) drawCell(mctx,c,r,HEX[eng.board[r][c]],CELL,false); }
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ const t=eng.board[r][c]; if(t) drawCell(mctx,c,r,effectiveColor(t),CELL,false,hasSkin(t)); }
   if(eng.cur){
     const gy = ghostY(eng);
     const {m,x,type} = eng.cur;
-    for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){ if(m[r][c] && gy+r>=0) drawCell(mctx, x+c, gy+r, HEX[type], CELL, true); }
-    for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){ if(m[r][c] && eng.cur.y+r>=0) drawCell(mctx, x+c, eng.cur.y+r, HEX[type], CELL, false); }
+    const col = effectiveColor(type), wv = hasSkin(type);
+    for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){ if(m[r][c] && gy+r>=0) drawCell(mctx, x+c, gy+r, col, CELL, true, wv); }
+    for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){ if(m[r][c] && eng.cur.y+r>=0) drawCell(mctx, x+c, eng.cur.y+r, col, CELL, false, wv); }
   }
 }
 function drawMini(ctx, type, w, h, cell){
   ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,w,h);
   if(!type) return;
+  const col = effectiveColor(type), wv = hasSkin(type);
   const m = SHAPES[type]; const n = m.length;
   const offx = (w - n*cell)/2, offy = (h - n*cell)/2;
-  for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(m[r][c]){ ctx.fillStyle = HEX[type]; ctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2); } }
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    if(!m[r][c]) continue;
+    let fillColor = col;
+    if(wv){
+      const t = performance.now()/450;
+      const phase = (c*0.7 + r*0.4) + t;
+      fillColor = shadeHex(col, 0.75 + 0.35*Math.sin(phase));
+    }
+    ctx.fillStyle = fillColor; ctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2);
+  }
 }
 function drawHold(){ drawMini(hctx, eng.held, 96, 72, 20); }
 function drawNextQueue(){
@@ -967,9 +1240,19 @@ function drawNextQueue(){
   const upcoming = eng.queue.slice(0,5);
   const slotH = 68;
   upcoming.forEach((type, i)=>{
+    const col = effectiveColor(type), wv = hasSkin(type);
     const m = SHAPES[type]; const n = m.length; const cell = 16;
     const offx = (96 - n*cell)/2, offy = i*slotH + (slotH - n*cell)/2;
-    for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(m[r][c]){ nctx.fillStyle = HEX[type]; nctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2); } }
+    for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+      if(!m[r][c]) continue;
+      let fillColor = col;
+      if(wv){
+        const t = performance.now()/450;
+        const phase = (c*0.7 + r*0.4) + t;
+        fillColor = shadeHex(col, 0.75 + 0.35*Math.sin(phase));
+      }
+      nctx.fillStyle = fillColor; nctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2);
+    }
   });
 }
 function renderAll(){
@@ -1055,6 +1338,9 @@ function checkGameOver(){
     if(mpActive){
       mpSendState();
     } else {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
+      reportSingleScore(eng.score);
       document.getElementById('final-score').textContent = eng.score;
       document.getElementById('final-sub').textContent = `라인 ${eng.lines} · 레벨 ${eng.level}`;
       document.getElementById('overlay-gameover').style.display = 'flex';
