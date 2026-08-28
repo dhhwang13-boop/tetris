@@ -318,6 +318,17 @@
       </div>
     </div>
   </div>
+  <div class="menu-coin-display" id="menu-coin-display">🪙 <span id="menu-coin-count">0</span></div>
+  <div class="menu-foot">전 세계 어디서든 방을 만들거나 참여할 수 있어요.</div>
+
+  <div class="dev-badge">
+    <img src="assets/dev-avatar.png" alt="developer">
+    <div>
+      <div class="dev-badge-label">Game Developer</div>
+      <div class="dev-badge-name">amumu</div>
+    </div>
+  </div>
+</div>
 
 <!-- ================= 설정 ================= -->
 <div class="screen" id="screen-settings">
@@ -329,17 +340,6 @@
     <label style="margin-top:16px; display:block;">효과음 음량</label>
     <input type="range" id="settings-sfx-volume" min="0" max="100" value="80" class="settings-volume-slider">
     <button class="ov-btn ghost" id="settings-back" style="width:100%; margin-top:20px;">← 뒤로</button>
-  </div>
-</div>
-  <div class="menu-coin-display" id="menu-coin-display">🪙 <span id="menu-coin-count">0</span></div>
-  <div class="menu-foot">전 세계 어디서든 방을 만들거나 참여할 수 있어요.</div>
-
-  <div class="dev-badge">
-    <img src="assets/dev-avatar.png" alt="developer">
-    <div>
-      <div class="dev-badge-label">Game Developer</div>
-      <div class="dev-badge-name">amumu</div>
-    </div>
   </div>
 </div>
 
@@ -739,16 +739,16 @@ function bgmBaseVolume(){ return getBgmMuted() ? 0 : getBgmVolume()/100; }
 function applyBgmVolumeNow(){
   if(!bgm.duration || bgm.paused) { bgm.volume = bgmBaseVolume(); return; }
   const remain = bgm.duration - bgm.currentTime;
-  let factor = 1;
-  if(bgm.currentTime <= BGM_FADE_SEC) factor = Math.min(factor, bgm.currentTime/BGM_FADE_SEC);
-  if(remain <= BGM_FADE_SEC && remain > 0) factor = Math.min(factor, remain/BGM_FADE_SEC);
-  bgm.volume = bgmBaseVolume() * Math.max(0, factor);
+  if(remain <= BGM_FADE_SEC && remain > 0){
+    bgm.volume = bgmBaseVolume() * (remain/BGM_FADE_SEC);
+  } else {
+    bgm.volume = bgmBaseVolume();
+  }
 }
 bgm.addEventListener('timeupdate', applyBgmVolumeNow);
 bgm.addEventListener('ended', ()=>{
   clearTimeout(bgmGapTimer);
   bgmGapTimer = setTimeout(()=>{
-    bgm.currentTime = 0;
     if(MUSIC_SCREENS.has(currentActiveScreenId())) startBgmPlayback();
   }, BGM_GAP_MS);
 });
@@ -757,7 +757,8 @@ function currentActiveScreenId(){
   return el ? el.id : null;
 }
 function startBgmPlayback(){
-  bgm.volume = (bgm.currentTime < 0.5) ? 0 : bgmBaseVolume();
+  bgm.currentTime = 0;
+  bgm.volume = bgmBaseVolume();
   bgm.play().then(()=>{ bgmStarted = true; }).catch(()=>{});
 }
 function updateBgmForScreen(id){
@@ -777,21 +778,22 @@ let gameBgmStarted = false;
 function applyGameBgmVolumeNow(){
   if(!gameBgm.duration || gameBgm.paused){ gameBgm.volume = bgmBaseVolume(); return; }
   const remain = gameBgm.duration - gameBgm.currentTime;
-  let factor = 1;
-  if(gameBgm.currentTime <= BGM_FADE_SEC) factor = Math.min(factor, gameBgm.currentTime/BGM_FADE_SEC);
-  if(remain <= BGM_FADE_SEC && remain > 0) factor = Math.min(factor, remain/BGM_FADE_SEC);
-  gameBgm.volume = bgmBaseVolume() * Math.max(0, factor);
+  if(remain <= BGM_FADE_SEC && remain > 0){
+    gameBgm.volume = bgmBaseVolume() * (remain/BGM_FADE_SEC);
+  } else {
+    gameBgm.volume = bgmBaseVolume();
+  }
 }
 gameBgm.addEventListener('timeupdate', applyGameBgmVolumeNow);
 gameBgm.addEventListener('ended', ()=>{
   clearTimeout(gameBgmGapTimer);
   gameBgmGapTimer = setTimeout(()=>{
-    gameBgm.currentTime = 0;
     if(currentActiveScreenId()==='screen-game') startGameBgmPlayback();
   }, BGM_GAP_MS);
 });
 function startGameBgmPlayback(){
-  gameBgm.volume = (gameBgm.currentTime < 0.5) ? 0 : bgmBaseVolume();
+  gameBgm.currentTime = 0;
+  gameBgm.volume = bgmBaseVolume();
   gameBgm.play().then(()=>{ gameBgmStarted = true; }).catch(()=>{});
 }
 function updateGameBgmForScreen(id){
