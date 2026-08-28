@@ -77,6 +77,33 @@
   .panel-label{ font-size:10px; color:var(--dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; text-align:center; }
 
   .left-col{ display:flex; flex-direction:column; gap:14px; width:130px; }
+  .left-col.mp-mode{ height:608px; }
+  .chat-panel{ flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; position:relative; }
+  .chat-log{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
+  .chat-line{ font-size:10.5px; line-height:1.4; color:var(--text); word-break:break-word; }
+  .chat-line b{ color:var(--cyan); font-weight:700; margin-right:3px; }
+  .chat-input-row{ display:flex; gap:5px; }
+  .chat-input-row input[type=text]{
+    flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text);
+    padding:7px 8px; border-radius:6px; font-family:inherit; font-size:11px; outline:none;
+  }
+  .chat-input-row input[type=text]:focus{ border-color:var(--cyan); }
+  .chat-emoji-btn{
+    font-family:inherit; background:var(--panel2); border:1px solid var(--line); border-radius:6px;
+    cursor:pointer; font-size:15px; padding:0 8px; flex-shrink:0;
+  }
+  .chat-emoji-popover{
+    position:absolute; bottom:52px; right:10px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:8px; padding:6px; display:flex; gap:6px; z-index:10;
+  }
+  .chat-emoji-opt{ font-size:20px; background:none; border:none; cursor:pointer; padding:2px 4px; border-radius:6px; }
+  .chat-emoji-opt:hover{ background:var(--bg); }
+  .opp-speech-bubble{
+    position:absolute; top:-6px; right:6px; background:#fff; color:#111; font-size:15px;
+    border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.4); animation: bubblePop .2s ease; z-index:6;
+  }
+  @keyframes bubblePop{ from{ transform:scale(0.4); opacity:0; } to{ transform:scale(1); opacity:1; } }
   .right-col{ display:flex; flex-direction:column; gap:14px; width:130px; }
   .center-col{ display:flex; flex-direction:column; align-items:center; }
 
@@ -245,6 +272,8 @@
 <div class="screen" id="screen-mp-create">
   <div class="mp-card" style="width:480px;">
     <div class="mp-title">방 생성</div>
+    <label>방 제목 (선택)</label>
+    <input type="text" id="mp-room-title" maxlength="20" placeholder="예: 초보만 오세요">
     <label>공개 설정</label>
     <div class="mp-radio-row">
       <label><input type="radio" name="mp-visibility" value="public" checked> 공개</label>
@@ -299,24 +328,36 @@
   </div>
 </div>
 
-<!-- ================= 게임 화면 (싱글플레이) ================= -->
+<!-- ================= 게임 화면 (싱글플레이 / 멀티플레이 공용) ================= -->
 <div class="screen" id="screen-game">
   <div style="display:flex; flex-direction:column; align-items:center;">
-    <div class="topbar">
+    <div class="topbar" id="game-topbar">
       <button id="btn-back-menu">← 메뉴</button>
       <button id="btn-pause">일시정지 (Esc)</button>
     </div>
     <div class="game-shell">
-      <div class="left-col">
-        <div class="panel">
+      <div class="left-col" id="left-col">
+        <div class="panel" id="hold-panel">
           <div class="panel-label">Hold</div>
           <canvas id="hold-canvas" width="96" height="72"></canvas>
         </div>
-        <div class="panel">
+        <div class="panel" id="stats-panel">
           <div class="panel-label">Stats</div>
           <div class="stat-row"><span>점수</span><b id="stat-score">0</b></div>
           <div class="stat-row"><span>라인</span><b id="stat-lines">0</b></div>
           <div class="stat-row"><span>레벨</span><b id="stat-level">1</b></div>
+        </div>
+        <div class="panel chat-panel" id="chat-panel" style="display:none;">
+          <div class="panel-label">Chat</div>
+          <div id="chat-log" class="chat-log"></div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" maxlength="80" placeholder="메시지 입력...">
+            <button id="chat-emoji-btn" class="chat-emoji-btn" title="이모티콘">🙂</button>
+          </div>
+          <div id="chat-emoji-popover" class="chat-emoji-popover" style="display:none;">
+            <button class="chat-emoji-opt" data-emoji="😜">😜</button>
+            <button class="chat-emoji-opt" data-emoji="👍">👍</button>
+          </div>
         </div>
       </div>
 
@@ -349,9 +390,9 @@
           </div>
           <div class="attack-toast" id="attack-toast"></div>
         </div>
-        <div class="controls-help">
+        <div class="controls-help" id="controls-help">
           <b>←/→</b> 이동 &nbsp; <b>↓</b> 소프트드롭 &nbsp; <b>↑</b> 회전 &nbsp; <b>Z</b> 반대회전<br>
-          <b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 일시정지
+          <span id="controls-help-extra"><b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 일시정지</span>
         </div>
       </div>
 
@@ -485,6 +526,10 @@ function mpHandleMessage(msg){
     case 'gameStart': startMultiplayerGame(msg.players); break;
     case 'opponentState': mpApplyOpponentState(msg); break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
+    case 'chat':
+      appendChatLine(msg.name, msg.text);
+      if(msg.isEmoji) mpShowSpeechBubble(msg.id, msg.text);
+      break;
     case 'end': mpEndGame(msg.ranking); break;
   }
 }
@@ -518,6 +563,7 @@ document.querySelectorAll('input[name="mp-visibility"]').forEach(r=>{
 document.getElementById('mp-create-btn').addEventListener('click', ()=>{
   const name = document.getElementById('mp-name').value.trim();
   const server = document.getElementById('mp-server').value.trim();
+  const roomTitle = document.getElementById('mp-room-title').value.trim();
   const isPrivate = document.querySelector('input[name="mp-visibility"]:checked').value === 'private';
   const password = document.getElementById('mp-password').value.trim();
   const err = document.getElementById('mp-create-err');
@@ -526,7 +572,7 @@ document.getElementById('mp-create-btn').addEventListener('click', ()=>{
   if(isPrivate && !password){ err.textContent = '비공개 방은 입장 코드를 설정해주세요.'; return; }
   err.textContent = '연결 중...';
   mpIsPrivateRoom = isPrivate; mpMyPassword = password;
-  mpConnect(server, ()=>{ err.textContent=''; mpSend({type:'create', name, isPrivate, password}); }, (m)=>{ err.textContent = m; });
+  mpConnect(server, ()=>{ err.textContent=''; mpSend({type:'create', name, isPrivate, password, roomTitle}); }, (m)=>{ err.textContent = m; });
 });
 
 // ---- 참여: 방 목록 ----
@@ -554,7 +600,7 @@ function mpRenderRoomList(rooms){
   rooms.forEach(r=>{
     const row = document.createElement('div');
     row.className = 'mp-room-row';
-    row.innerHTML = `<span class="rn">${r.isPrivate ? '<span class="mp-lock-badge">🔒 비공개</span>' : '<span class="mp-lock-badge" style="background:rgba(82,255,157,.15); color:var(--good);">공개</span>'} ${mpEscapeHtml(r.hostName)}의 방</span><span class="rc">${r.count}/${r.max}</span>`;
+    row.innerHTML = `<span class="rn">${r.isPrivate ? '<span class="mp-lock-badge">🔒 비공개</span>' : '<span class="mp-lock-badge" style="background:rgba(82,255,157,.15); color:var(--good);">공개</span>'} ${mpEscapeHtml(r.title || (r.hostName + '의 방'))}</span><span class="rc">${r.count}/${r.max}</span>`;
     row.addEventListener('dblclick', ()=>{ mpTryJoinRoom(r.roomId, r.isPrivate); });
     listEl.appendChild(row);
   });
@@ -685,6 +731,8 @@ function startMultiplayerGame(playerList){
   document.getElementById('overlay-mp-end').style.display = 'none';
   document.getElementById('overlay-pause').style.display = 'none';
   document.getElementById('opp-col').style.display = 'flex';
+  setLeftColLayout(true);
+  document.getElementById('chat-log').innerHTML = '';
   mpActive = true; gameOverHandled = false;
 
   eng = newEngine();
@@ -717,6 +765,70 @@ function startMultiplayerGame(playerList){
   mpStateTimer = setInterval(mpSendState, 250);
   mpSendState();
 }
+
+// ---- 좌측 패널 레이아웃 전환 (싱글: HOLD→STATS / 멀티: STATS→HOLD→채팅) ----
+function setLeftColLayout(isMulti){
+  const left = document.getElementById('left-col');
+  const holdPanel = document.getElementById('hold-panel');
+  const statsPanel = document.getElementById('stats-panel');
+  const chatPanel = document.getElementById('chat-panel');
+  const topbar = document.getElementById('game-topbar');
+  left.classList.toggle('mp-mode', isMulti);
+  if(isMulti){
+    left.insertBefore(statsPanel, holdPanel);
+    chatPanel.style.display = 'flex';
+    topbar.style.display = 'none';
+    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드';
+  } else {
+    left.insertBefore(holdPanel, statsPanel);
+    chatPanel.style.display = 'none';
+    topbar.style.display = 'flex';
+    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 일시정지';
+  }
+}
+
+// ---- 채팅 ----
+function appendChatLine(name, text){
+  const log = document.getElementById('chat-log');
+  const line = document.createElement('div');
+  line.className = 'chat-line';
+  line.innerHTML = `<b>${mpEscapeHtml(name)}:</b>${mpEscapeHtml(text)}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+function mpSendChat(text, isEmoji){
+  if(!text) return;
+  appendChatLine('나', text);
+  mpSend({type:'chat', text, isEmoji: !!isEmoji});
+}
+function mpShowSpeechBubble(id, emoji){
+  const card = document.getElementById('opp-'+id);
+  if(!card) return;
+  const old = card.querySelector('.opp-speech-bubble');
+  if(old) old.remove();
+  const bubble = document.createElement('div');
+  bubble.className = 'opp-speech-bubble';
+  bubble.textContent = emoji;
+  card.appendChild(bubble);
+  setTimeout(()=>{ if(bubble.parentNode) bubble.remove(); }, 2500);
+}
+document.getElementById('chat-input').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if(text){ mpSendChat(text, false); input.value = ''; }
+  }
+});
+document.getElementById('chat-emoji-btn').addEventListener('click', ()=>{
+  const pop = document.getElementById('chat-emoji-popover');
+  pop.style.display = pop.style.display === 'flex' ? 'none' : 'flex';
+});
+document.querySelectorAll('.chat-emoji-opt').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    mpSendChat(btn.dataset.emoji, true);
+    document.getElementById('chat-emoji-popover').style.display = 'none';
+  });
+});
 
 // ---------- 엔진 ----------
 let eng = null;
@@ -950,7 +1062,7 @@ function checkGameOver(){
   }
 }
 function togglePause(){
-  if(!eng || eng.gameOver) return;
+  if(!eng || eng.gameOver || mpActive) return;
   eng.paused = !eng.paused;
   document.getElementById('overlay-pause').style.display = eng.paused ? 'flex' : 'none';
   if(!eng.paused){ lastTime = 0; }
@@ -967,6 +1079,7 @@ function resetAndStart(){
   document.getElementById('overlay-mp-end').style.display = 'none';
   document.getElementById('overlay-pause').style.display = 'none';
   document.getElementById('opp-col').style.display = 'none';
+  setLeftColLayout(false);
   mpActive = false; gameOverHandled = false;
   eng = newEngine();
   spawnFromQueue(eng);
