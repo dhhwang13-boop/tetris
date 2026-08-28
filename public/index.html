@@ -102,6 +102,7 @@
   .shop-color-label:first-child{ margin-top:0; }
   .shop-color-row{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
   .shop-item{ background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 6px; text-align:center; width:92px; }
+  .shop-piece-canvas{ display:block; margin:0 auto; }
   .shop-item-price{ font-size:9.5px; color:var(--dim); margin:4px 0 6px; }
   .shop-btn-buy{ width:100%; font-family:inherit; padding:6px; border-radius:6px; border:none; cursor:pointer; font-size:10px; font-weight:700; }
   .shop-btn-buy.buy{ background:linear-gradient(90deg,var(--cyan),#7fe8ff); color:#00303c; }
@@ -119,6 +120,13 @@
     font-size:16px; font-weight:900; line-height:1.3;
     background:linear-gradient(90deg, var(--cyan), var(--pink)); -webkit-background-clip:text; background-clip:text; color:transparent;
   }
+  .online-badge{
+    position:fixed; bottom:20px; left:20px; display:flex; align-items:center; gap:8px;
+    background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:8px 16px;
+    font-size:14px; color:var(--dim);
+  }
+  .online-badge b{ color:var(--good); font-size:14px; }
+  .online-person-icon{ width:16px; height:16px; color:var(--dim); flex-shrink:0; }
 
   /* ---------- 게임 화면 ---------- */
   #screen-game{ align-items:center; justify-content:center; }
@@ -189,7 +197,7 @@
   .ov-btn.ghost{ background:var(--panel2); color:var(--text); border:1px solid var(--line); }
 
   /* ---------- 멀티플레이 ---------- */
-  #screen-mp-login, #screen-mp-create, #screen-mp-join, #screen-mp-lobby, #screen-shop, #screen-rank, #screen-nickname, #screen-settings{ align-items:center; justify-content:center; }
+  #screen-mp-login, #screen-mp-create, #screen-mp-join, #screen-mp-lobby, #screen-shop, #screen-rank, #screen-nickname{ align-items:center; justify-content:center; }
   .mp-card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; width:360px; }
   .mp-card label{ display:block; font-size:11px; color:var(--dim); letter-spacing:1px; margin:14px 0 6px; text-transform:uppercase; }
   .mp-card label:first-of-type{ margin-top:0; }
@@ -328,18 +336,23 @@
       <div class="dev-badge-name">amumu</div>
     </div>
   </div>
+
+  <div class="online-badge" id="online-badge">
+    <svg class="online-person-icon" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"></circle><path d="M4 20a8 8 0 0 1 16 0z"></path></svg>
+    <b id="online-count">-</b>
+  </div>
 </div>
 
 <!-- ================= 설정 ================= -->
-<div class="screen" id="screen-settings">
-  <div class="mp-card" style="width:380px;">
+<div class="mp-modal" id="settings-modal" style="display:none;">
+  <div class="mp-modal-card" style="width:380px;">
     <div class="mp-title">설정</div>
     <label class="settings-mute-row"><input type="checkbox" id="settings-mute"> 음소거</label>
     <label style="margin-top:16px; display:block;">음악 음량</label>
-    <input type="range" id="settings-volume" min="0" max="100" value="80" class="settings-volume-slider">
+    <input type="range" id="settings-volume" min="0" max="100" value="25" class="settings-volume-slider">
     <label style="margin-top:16px; display:block;">효과음 음량</label>
-    <input type="range" id="settings-sfx-volume" min="0" max="100" value="80" class="settings-volume-slider">
-    <button class="ov-btn ghost" id="settings-back" style="width:100%; margin-top:20px;">← 뒤로</button>
+    <input type="range" id="settings-sfx-volume" min="0" max="100" value="40" class="settings-volume-slider">
+    <button class="ov-btn ghost" id="settings-back" style="width:100%; margin-top:20px;">닫기</button>
   </div>
 </div>
 
@@ -366,7 +379,7 @@
       <div class="mp-title" style="margin:0;">상점</div>
       <div class="coin-badge">🪙 <span id="shop-coin-count">0</span></div>
     </div>
-    <div class="mp-sub" style="text-align:left; margin:8px 0 16px;">색상별로 모든 블록 모양을 구매/장착할 수 있어요 (개당 10코인). 멀티플레이에서 이기면 코인을 얻어요.</div>
+    <div class="mp-sub" style="text-align:left; margin:8px 0 16px;">색상별로 모든 블록 모양을 구매/장착할 수 있어요.</div>
     <div class="shop-grid" id="shop-grid"></div>
     <div class="shop-msg" id="shop-msg"></div>
     <button class="ov-btn ghost" id="shop-back" style="width:100%; margin-top:16px;">← 메뉴로</button>
@@ -594,6 +607,13 @@ function coinsForResult(rank, total){
   const t = table[total] || {};
   return t[rank] || 0;
 }
+function coinsForSingleScore(score){
+  if(score>=120000) return 4;
+  if(score>=100000) return 3;
+  if(score>=90000) return 2;
+  if(score>=80000) return 1;
+  return 0;
+}
 function refreshMenuCoinDisplay(){
   const el = document.getElementById('menu-coin-count');
   if(el) el.textContent = getCoins();
@@ -637,7 +657,7 @@ function renderShop(){
       if(isOwnedCombo(type, colorId)){
         eqMap[type] = colorId; setEquippedMap(eqMap); renderShop(); return;
       }
-      if(getCoins() < SKIN_PRICE){ document.getElementById('shop-msg').textContent = '코인이 부족해요. 멀티플레이에서 이겨서 코인을 모아보세요!'; return; }
+      if(getCoins() < SKIN_PRICE){ document.getElementById('shop-msg').textContent = '코인이 부족해요. 게임을 플레이하여 코인을 모아보세요!'; return; }
       addCoins(-SKIN_PRICE);
       const owned2 = getOwnedCombos(); owned2.push(comboKey(type,colorId)); setOwnedCombos(owned2);
       eqMap[type] = colorId; setEquippedMap(eqMap);
@@ -647,21 +667,30 @@ function renderShop(){
   });
   startShopAnimation();
 }
+function tightBounds(matrix){
+  let minR=Infinity, maxR=-Infinity, minC=Infinity, maxC=-Infinity;
+  for(let r=0;r<matrix.length;r++) for(let c=0;c<matrix.length;c++){
+    if(matrix[r][c]){ if(r<minR)minR=r; if(r>maxR)maxR=r; if(c<minC)minC=c; if(c>maxC)maxC=c; }
+  }
+  return { minR, minC, h: maxR-minR+1, w: maxC-minC+1 };
+}
 function startShopAnimation(){
   stopShopAnimation();
   function loop(){
     document.querySelectorAll('.shop-piece-canvas').forEach(canvas=>{
       const ctx = canvas.getContext('2d');
       const type = canvas.dataset.type, color = canvas.dataset.color;
-      const m = SHAPES[type]; const n = m.length; const cell = Math.floor(42/n);
+      const m = SHAPES[type];
+      const b = tightBounds(m);
+      const cell = Math.floor(42/Math.max(b.w,b.h));
       ctx.clearRect(0,0,48,48);
-      const offx = (48-n*cell)/2, offy = (48-n*cell)/2;
+      const offx = (48 - b.w*cell)/2, offy = (48 - b.h*cell)/2;
       const t = performance.now()/450;
-      for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+      for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){
         if(!m[r][c]) continue;
         const phase = (c*0.7+r*0.4)+t;
         ctx.fillStyle = shadeHex(color, 0.75+0.35*Math.sin(phase));
-        ctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2);
+        ctx.fillRect(offx+(c-b.minC)*cell+1, offy+(r-b.minR)*cell+1, cell-2, cell-2);
       }
     });
     shopAnimId = requestAnimationFrame(loop);
@@ -697,17 +726,19 @@ function renderRank(){
   document.getElementById('rank-mp-name').textContent = name;
   document.getElementById('rank-mp-record').textContent = `${wins}승 (${rate}%)`;
 }
-let settingsReturnScreen = 'screen-menu';
 document.getElementById('btn-rank').addEventListener('click', ()=>{ renderRank(); showScreen('screen-rank'); });
 document.getElementById('rank-back').addEventListener('click', ()=>{ showScreen('screen-menu'); });
-document.getElementById('btn-settings').addEventListener('click', ()=>{
-  settingsReturnScreen = 'screen-menu';
+function openSettingsModal(){
   document.getElementById('settings-mute').checked = getBgmMuted();
   document.getElementById('settings-volume').value = getBgmVolume();
   document.getElementById('settings-sfx-volume').value = getSfxVolume();
-  showScreen('screen-settings');
-});
-document.getElementById('settings-back').addEventListener('click', ()=>{ showScreen(settingsReturnScreen); });
+  document.getElementById('settings-modal').style.display = 'flex';
+}
+function closeSettingsModal(){
+  document.getElementById('settings-modal').style.display = 'none';
+}
+document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
+document.getElementById('settings-back').addEventListener('click', closeSettingsModal);
 document.getElementById('settings-mute').addEventListener('change', (e)=>{
   setBgmMuted(e.target.checked);
   applyAllMusicVolumesNow();
@@ -725,13 +756,13 @@ const BGM_FADE_SEC = 3;
 const BGM_GAP_MS = 5000;
 const MUSIC_SCREENS = new Set([
   'screen-nickname','screen-menu','screen-mp-login','screen-mp-create','screen-mp-join',
-  'screen-mp-lobby','screen-shop','screen-rank','screen-settings'
+  'screen-mp-lobby','screen-shop','screen-rank'
 ]);
 const bgm = new Audio('assets/bgm.mp3');
 bgm.loop = false;
 let bgmGapTimer = null;
 let bgmStarted = false;
-function getBgmVolume(){ const v = parseInt(localStorage.getItem('tb_bgm_volume')||'80',10); return isNaN(v)?80:Math.max(0,Math.min(100,v)); }
+function getBgmVolume(){ const v = parseInt(localStorage.getItem('tb_bgm_volume')||'25',10); return isNaN(v)?25:Math.max(0,Math.min(100,v)); }
 function setBgmVolume(v){ localStorage.setItem('tb_bgm_volume', String(v)); }
 function getBgmMuted(){ return localStorage.getItem('tb_bgm_muted')==='1'; }
 function setBgmMuted(b){ localStorage.setItem('tb_bgm_muted', b?'1':'0'); }
@@ -829,7 +860,7 @@ function ensureSfxCtx(){
   if(sfxCtx.state === 'suspended') sfxCtx.resume().catch(()=>{});
   return sfxCtx;
 }
-function getSfxVolume(){ const v = parseInt(localStorage.getItem('tb_sfx_volume')||'80',10); return isNaN(v)?80:Math.max(0,Math.min(100,v)); }
+function getSfxVolume(){ const v = parseInt(localStorage.getItem('tb_sfx_volume')||'40',10); return isNaN(v)?40:Math.max(0,Math.min(100,v)); }
 function setSfxVolume(v){ localStorage.setItem('tb_sfx_volume', String(v)); }
 function sfxGain(){ return getSfxVolume()/100; }
 function playTick(){
@@ -901,11 +932,35 @@ function playLineClearForCount(n){
   src.start();
 }
 
+// ---------- 접속 인원수 표시 ----------
+let onlineCountTimer = null;
+function getHttpBase(){
+  const el = document.getElementById('mp-server');
+  const v = (el && el.value ? el.value.trim() : '') || 'wss://tetris-ym3c.onrender.com';
+  return v.replace(/^wss:\/\//,'https://').replace(/^ws:\/\//,'http://');
+}
+function refreshOnlineCount(){
+  fetch(getHttpBase() + '/stats').then(r=>r.json()).then(d=>{
+    const el = document.getElementById('online-count');
+    if(el) el.textContent = (typeof d.online === 'number') ? d.online : '-';
+  }).catch(()=>{
+    const el = document.getElementById('online-count');
+    if(el) el.textContent = '-';
+  });
+}
+function startOnlineCountPolling(){
+  refreshOnlineCount();
+  clearInterval(onlineCountTimer);
+  onlineCountTimer = setInterval(refreshOnlineCount, 10000);
+}
+function stopOnlineCountPolling(){ clearInterval(onlineCountTimer); }
+
 // ---------- 화면 전환 ----------
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(id === 'screen-menu') refreshMenuCoinDisplay();
+  if(id === 'screen-menu'){ refreshMenuCoinDisplay(); startOnlineCountPolling(); }
+  else { stopOnlineCountPolling(); }
   updateBgmForScreen(id);
   updateGameBgmForScreen(id);
 }
@@ -947,11 +1002,7 @@ document.getElementById('btn-esc-exit').addEventListener('click', ()=>{
 });
 document.getElementById('btn-esc-settings').addEventListener('click', ()=>{
   closeEscMenu();
-  settingsReturnScreen = 'screen-game';
-  document.getElementById('settings-mute').checked = getBgmMuted();
-  document.getElementById('settings-volume').value = getBgmVolume();
-  document.getElementById('settings-sfx-volume').value = getSfxVolume();
-  showScreen('screen-settings');
+  openSettingsModal();
 });
 
 // ---------- 멀티플레이 네트워킹 ----------
@@ -1286,12 +1337,15 @@ function setLeftColLayout(isMulti){
   left.classList.toggle('mp-mode', isMulti);
   if(isMulti){
     left.insertBefore(statsPanel, holdPanel);
+    holdPanel.style.display = 'none';
     chatPanel.style.display = 'flex';
+    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>Esc</b> 메뉴';
   } else {
     left.insertBefore(holdPanel, statsPanel);
+    holdPanel.style.display = 'block';
     chatPanel.style.display = 'none';
+    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 메뉴';
   }
-  document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 메뉴';
 }
 
 // ---- 채팅 ----
@@ -1423,6 +1477,7 @@ function softDropStep(e){
   return cleared;
 }
 function holdPiece(e){
+  if(mpActive) return;
   if(!e.cur||e.gameOver||e.paused||e.holdUsed) return;
   const curType = e.cur.type;
   if(e.held === null){
@@ -1609,8 +1664,11 @@ function checkGameOver(){
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
       reportSingleScore(eng.score);
+      const coinsWon = coinsForSingleScore(eng.score);
+      if(coinsWon>0){ addCoins(coinsWon); refreshMenuCoinDisplay(); }
       document.getElementById('final-score').textContent = eng.score;
-      document.getElementById('final-sub').textContent = `라인 ${eng.lines} · 레벨 ${eng.level}`;
+      document.getElementById('final-sub').innerHTML = `라인 ${eng.lines} · 레벨 ${eng.level}` +
+        (coinsWon>0 ? `<br><span style="color:var(--yellow); font-weight:700;">🪙 +${coinsWon} 코인 획득!</span>` : '');
       document.getElementById('overlay-gameover').style.display = 'flex';
     }
   }
