@@ -76,6 +76,16 @@
   }
   .rank-btn:hover{ transform:translateY(-1px); border-color:var(--pink); }
   .rank-btn svg{ width:32px; height:32px; }
+  .rank-settings-row{ flex:1; display:flex; gap:10px; }
+  .rank-settings-row .rank-btn{ flex:1; margin:0; }
+  .settings-btn{
+    flex:1; background:var(--panel2); border:2px dashed var(--dim); border-radius:16px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .1s ease, border-color .15s ease;
+  }
+  .settings-btn:hover{ transform:translateY(-1px); border-color:var(--text); }
+  .settings-btn svg{ width:28px; height:28px; }
+  .settings-mute-row{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-top:16px; cursor:pointer; text-transform:none; letter-spacing:0; }
+  .settings-volume-slider{ width:100%; margin-top:8px; accent-color:var(--cyan); }
   .rank-section{ margin-top:16px; }
   .rank-section-label{ font-size:11px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
   .rank-value{ font-weight:900; color:var(--yellow); }
@@ -87,17 +97,16 @@
   .mp-nick-line b{ color:var(--text); }
   .mp-nick-change{ color:var(--cyan); cursor:pointer; text-decoration:underline; }
   .coin-badge{ background:var(--panel2); border:1px solid var(--line); border-radius:20px; padding:6px 14px; font-size:13px; font-weight:700; color:var(--yellow); }
-  .shop-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-  .shop-item{ background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:14px 10px; text-align:center; }
-  .shop-swatch{ width:100%; height:56px; border-radius:8px; margin-bottom:8px; position:relative; overflow:hidden; }
-  .shop-swatch .wave{ position:absolute; inset:0; background:linear-gradient(120deg, transparent 0%, rgba(255,255,255,.4) 45%, transparent 60%); animation: waveSlide 2.2s linear infinite; }
-  @keyframes waveSlide{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(100%);} }
-  .shop-item-name{ font-size:12px; font-weight:700; margin-bottom:4px; }
-  .shop-item-price{ font-size:11px; color:var(--dim); margin-bottom:8px; }
-  .shop-btn-buy{ width:100%; font-family:inherit; padding:8px; border-radius:6px; border:none; cursor:pointer; font-size:11px; font-weight:700; }
+  .shop-grid{ max-height:440px; overflow-y:auto; padding-right:4px; }
+  .shop-color-label{ font-size:11px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin:14px 0 6px; text-align:center; }
+  .shop-color-label:first-child{ margin-top:0; }
+  .shop-color-row{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+  .shop-item{ background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 6px; text-align:center; width:92px; }
+  .shop-item-price{ font-size:9.5px; color:var(--dim); margin:4px 0 6px; }
+  .shop-btn-buy{ width:100%; font-family:inherit; padding:6px; border-radius:6px; border:none; cursor:pointer; font-size:10px; font-weight:700; }
   .shop-btn-buy.buy{ background:linear-gradient(90deg,var(--cyan),#7fe8ff); color:#00303c; }
   .shop-btn-buy.equip{ background:var(--panel); border:1px solid var(--line); color:var(--text); }
-  .shop-btn-buy.equipped{ background:rgba(82,255,157,.15); color:var(--good); border:1px solid var(--good); cursor:default; }
+  .shop-btn-buy.equipped{ background:rgba(82,255,157,.15); color:var(--good); border:1px solid var(--good); }
   .shop-msg{ color:var(--bad); font-size:12px; text-align:center; margin-top:12px; min-height:14px; }
   .menu-foot{ color:var(--dim); font-size:11px; margin-top:26px; text-align:center; line-height:1.7; max-width:340px; }
   .dev-badge{
@@ -180,7 +189,7 @@
   .ov-btn.ghost{ background:var(--panel2); color:var(--text); border:1px solid var(--line); }
 
   /* ---------- 멀티플레이 ---------- */
-  #screen-mp-login, #screen-mp-create, #screen-mp-join, #screen-mp-lobby, #screen-shop, #screen-rank, #screen-nickname{ align-items:center; justify-content:center; }
+  #screen-mp-login, #screen-mp-create, #screen-mp-join, #screen-mp-lobby, #screen-shop, #screen-rank, #screen-nickname, #screen-settings{ align-items:center; justify-content:center; }
   .mp-card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; width:360px; }
   .mp-card label{ display:block; font-size:11px; color:var(--dim); letter-spacing:1px; margin:14px 0 6px; text-transform:uppercase; }
   .mp-card label:first-of-type{ margin-top:0; }
@@ -290,17 +299,38 @@
           <path d="M2.5 3h2l2.2 11.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 7H6"></path>
         </svg>
       </div>
-      <div class="rank-btn" id="btn-rank" title="랭킹">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#3ddbff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="6" y1="3" x2="6" y2="21"></line>
-          <line x1="18" y1="3" x2="18" y2="21"></line>
-          <line x1="6" y1="7" x2="18" y2="7"></line>
-          <line x1="6" y1="12" x2="18" y2="12"></line>
-          <line x1="6" y1="17" x2="18" y2="17"></line>
-        </svg>
+      <div class="rank-settings-row">
+        <div class="rank-btn" id="btn-rank" title="랭킹">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#3ddbff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="6" y2="21"></line>
+            <line x1="18" y1="3" x2="18" y2="21"></line>
+            <line x1="6" y1="7" x2="18" y2="7"></line>
+            <line x1="6" y1="12" x2="18" y2="12"></line>
+            <line x1="6" y1="17" x2="18" y2="17"></line>
+          </svg>
+        </div>
+        <div class="settings-btn" id="btn-settings" title="설정">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#7a7f9c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </div>
       </div>
     </div>
   </div>
+
+<!-- ================= 설정 ================= -->
+<div class="screen" id="screen-settings">
+  <div class="mp-card" style="width:380px;">
+    <div class="mp-title">설정</div>
+    <label class="settings-mute-row"><input type="checkbox" id="settings-mute"> 음소거</label>
+    <label style="margin-top:16px; display:block;">음악 음량</label>
+    <input type="range" id="settings-volume" min="0" max="100" value="80" class="settings-volume-slider">
+    <label style="margin-top:16px; display:block;">효과음 음량</label>
+    <input type="range" id="settings-sfx-volume" min="0" max="100" value="80" class="settings-volume-slider">
+    <button class="ov-btn ghost" id="settings-back" style="width:100%; margin-top:20px;">← 뒤로</button>
+  </div>
+</div>
   <div class="menu-coin-display" id="menu-coin-display">🪙 <span id="menu-coin-count">0</span></div>
   <div class="menu-foot">전 세계 어디서든 방을 만들거나 참여할 수 있어요.</div>
 
@@ -331,12 +361,12 @@
 
 <!-- ================= 상점 ================= -->
 <div class="screen" id="screen-shop">
-  <div class="mp-card" style="width:660px;">
+  <div class="mp-card" style="width:780px;">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <div class="mp-title" style="margin:0;">상점</div>
       <div class="coin-badge">🪙 <span id="shop-coin-count">0</span></div>
     </div>
-    <div class="mp-sub" style="text-align:left; margin:8px 0 16px;">블록 색상 이펙트를 구매하고 장착해보세요 (개당 10코인). 멀티플레이에서 이기면 코인을 얻어요.</div>
+    <div class="mp-sub" style="text-align:left; margin:8px 0 16px;">색상별로 모든 블록 모양을 구매/장착할 수 있어요 (개당 10코인). 멀티플레이에서 이기면 코인을 얻어요.</div>
     <div class="shop-grid" id="shop-grid"></div>
     <div class="shop-msg" id="shop-msg"></div>
     <button class="ov-btn ghost" id="shop-back" style="width:100%; margin-top:16px;">← 메뉴로</button>
@@ -431,10 +461,6 @@
 <!-- ================= 게임 화면 (싱글플레이 / 멀티플레이 공용) ================= -->
 <div class="screen" id="screen-game">
   <div style="display:flex; flex-direction:column; align-items:center;">
-    <div class="topbar" id="game-topbar" style="display:none;">
-      <button id="btn-back-menu">← 메뉴</button>
-      <button id="btn-pause">일시정지 (Esc)</button>
-    </div>
     <div class="game-shell">
       <div class="left-col" id="left-col">
         <div class="panel" id="hold-panel">
@@ -464,11 +490,11 @@
       <div class="center-col">
         <div class="board-frame">
           <canvas id="main-canvas" width="300" height="600"></canvas>
-          <div class="overlay" id="overlay-pause" style="display:none;">
-            <h2>일시정지</h2>
+          <div class="overlay" id="overlay-esc-menu" style="display:none;">
+            <h2>메뉴</h2>
             <div class="overlay-btns">
-              <button class="ov-btn main" id="btn-resume">계속하기</button>
-              <button class="ov-btn ghost" id="btn-pause-menu">메뉴로</button>
+              <button class="ov-btn main" id="btn-esc-settings">설정</button>
+              <button class="ov-btn ghost" id="btn-esc-exit">종료</button>
             </div>
           </div>
           <div class="overlay" id="overlay-gameover" style="display:none;">
@@ -492,7 +518,7 @@
         </div>
         <div class="controls-help" id="controls-help">
           <b>←/→</b> 이동 &nbsp; <b>↓</b> 소프트드롭 &nbsp; <b>↑</b> 회전 &nbsp; <b>Z</b> 반대회전<br>
-          <span id="controls-help-extra"><b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 일시정지</span>
+          <span id="controls-help-extra"><b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 메뉴</span>
         </div>
       </div>
 
@@ -536,25 +562,31 @@ function rotateCCW(m){ const n=m.length; const r=Array.from({length:n},()=>Array
 function bag7(){ const a=TYPES.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 // ---------- 코인 & 상점 (로컬 저장, 기기별) ----------
-// 각 테트로미노 종류(I/O/T/S/Z/J/L)마다 독립적으로 구매/보유하는 색상 스킨
-const BLOCK_SKINS = [
-  {type:'I', name:'레드 I', color:'#ff4d5e'},
-  {type:'O', name:'오렌지 O', color:'#ff9d47'},
-  {type:'T', name:'옐로우 T', color:'#ffd93d'},
-  {type:'S', name:'그린 S', color:'#52ff9d'},
-  {type:'Z', name:'블루 Z', color:'#3ddbff'},
-  {type:'J', name:'인디고 J', color:'#4d6bff'},
-  {type:'L', name:'바이올렛 L', color:'#a855f7'},
+// 7가지 색상 x 7가지 블록모양 = 49개, 색상별로 모두 판매. 같은 블록모양이라도 색상마다 별개 구매.
+const COLORS7 = [
+  {id:'red', name:'레드', color:'#ff4d5e'},
+  {id:'orange', name:'오렌지', color:'#ff9d47'},
+  {id:'yellow', name:'옐로우', color:'#ffd93d'},
+  {id:'green', name:'그린', color:'#52ff9d'},
+  {id:'blue', name:'블루', color:'#3ddbff'},
+  {id:'indigo', name:'인디고', color:'#4d6bff'},
+  {id:'violet', name:'바이올렛', color:'#a855f7'},
 ];
+const SHOP_TYPES = ['I','O','T','S','Z','J','L'];
 const SKIN_PRICE = 10;
+function comboKey(type, colorId){ return type+':'+colorId; }
 function getCoins(){ return parseInt(localStorage.getItem('tb_coins')||'0',10) || 0; }
 function setCoins(n){ localStorage.setItem('tb_coins', String(Math.max(0,n))); }
 function addCoins(n){ setCoins(getCoins()+n); }
-function getOwnedSkins(){ try{ return JSON.parse(localStorage.getItem('tb_owned_skins')||'[]'); }catch(e){ return []; } }
-function setOwnedSkins(arr){ localStorage.setItem('tb_owned_skins', JSON.stringify(arr)); }
-function hasSkin(type){ return getOwnedSkins().includes(type); }
+function getOwnedCombos(){ try{ return JSON.parse(localStorage.getItem('tb_owned_combos')||'[]'); }catch(e){ return []; } }
+function setOwnedCombos(arr){ localStorage.setItem('tb_owned_combos', JSON.stringify(arr)); }
+function isOwnedCombo(type, colorId){ return getOwnedCombos().includes(comboKey(type,colorId)); }
+function getEquippedMap(){ try{ return JSON.parse(localStorage.getItem('tb_equipped_map')||'{}'); }catch(e){ return {}; } }
+function setEquippedMap(m){ localStorage.setItem('tb_equipped_map', JSON.stringify(m)); }
+function hasSkin(type){ return !!getEquippedMap()[type]; }
 function effectiveColor(type){
-  if(hasSkin(type)){ const s = BLOCK_SKINS.find(b=>b.type===type); if(s) return s.color; }
+  const eq = getEquippedMap()[type];
+  if(eq){ const c = COLORS7.find(x=>x.id===eq); if(c) return c.color; }
   return HEX[type];
 }
 function coinsForResult(rank, total){
@@ -572,27 +604,43 @@ function renderShop(){
   document.getElementById('shop-msg').textContent = '';
   const grid = document.getElementById('shop-grid');
   grid.innerHTML = '';
-  const owned = getOwnedSkins();
-  BLOCK_SKINS.forEach(s=>{
-    const isOwned = owned.includes(s.type);
-    const card = document.createElement('div');
-    card.className = 'shop-item';
-    card.innerHTML = `
-      <canvas class="shop-piece-canvas" width="72" height="72" data-type="${s.type}" data-color="${s.color}"></canvas>
-      <div class="shop-item-name">${s.name}</div>
-      <div class="shop-item-price">${isOwned ? '보유중' : SKIN_PRICE+' 코인'}</div>
-      <button class="shop-btn-buy ${isOwned?'equipped':'buy'}" data-type="${s.type}" ${isOwned?'disabled':''}>
-        ${isOwned ? '보유중' : '구매하기'}
-      </button>`;
-    grid.appendChild(card);
+  const equipped = getEquippedMap();
+  COLORS7.forEach(col=>{
+    const groupLabel = document.createElement('div');
+    groupLabel.className = 'shop-color-label';
+    groupLabel.textContent = col.name;
+    grid.appendChild(groupLabel);
+    const row = document.createElement('div');
+    row.className = 'shop-color-row';
+    SHOP_TYPES.forEach(type=>{
+      const owned = isOwnedCombo(type, col.id);
+      const active = equipped[type] === col.id;
+      const card = document.createElement('div');
+      card.className = 'shop-item';
+      card.innerHTML = `
+        <canvas class="shop-piece-canvas" width="48" height="48" data-type="${type}" data-color="${col.color}"></canvas>
+        <div class="shop-item-price">${owned ? (active?'장착됨':'보유중') : SKIN_PRICE+'코인'}</div>
+        <button class="shop-btn-buy ${active?'equipped':(owned?'equip':'buy')}" data-type="${type}" data-color="${col.id}">
+          ${active ? '해제' : (owned ? '장착' : '구매')}
+        </button>`;
+      row.appendChild(card);
+    });
+    grid.appendChild(row);
   });
-  grid.querySelectorAll('.shop-btn-buy:not([disabled])').forEach(btn=>{
+  grid.querySelectorAll('.shop-btn-buy').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const type = btn.dataset.type;
-      if(hasSkin(type)) return;
+      const type = btn.dataset.type, colorId = btn.dataset.color;
+      const eqMap = getEquippedMap();
+      if(eqMap[type] === colorId){
+        delete eqMap[type]; setEquippedMap(eqMap); renderShop(); return;
+      }
+      if(isOwnedCombo(type, colorId)){
+        eqMap[type] = colorId; setEquippedMap(eqMap); renderShop(); return;
+      }
       if(getCoins() < SKIN_PRICE){ document.getElementById('shop-msg').textContent = '코인이 부족해요. 멀티플레이에서 이겨서 코인을 모아보세요!'; return; }
       addCoins(-SKIN_PRICE);
-      const owned2 = getOwnedSkins(); owned2.push(type); setOwnedSkins(owned2);
+      const owned2 = getOwnedCombos(); owned2.push(comboKey(type,colorId)); setOwnedCombos(owned2);
+      eqMap[type] = colorId; setEquippedMap(eqMap);
       renderShop();
       refreshMenuCoinDisplay();
     });
@@ -605,9 +653,9 @@ function startShopAnimation(){
     document.querySelectorAll('.shop-piece-canvas').forEach(canvas=>{
       const ctx = canvas.getContext('2d');
       const type = canvas.dataset.type, color = canvas.dataset.color;
-      const m = SHAPES[type]; const n = m.length; const cell = Math.floor(64/n);
-      ctx.clearRect(0,0,72,72);
-      const offx = (72-n*cell)/2, offy = (72-n*cell)/2;
+      const m = SHAPES[type]; const n = m.length; const cell = Math.floor(42/n);
+      ctx.clearRect(0,0,48,48);
+      const offx = (48-n*cell)/2, offy = (48-n*cell)/2;
       const t = performance.now()/450;
       for(let r=0;r<n;r++) for(let c=0;c<n;c++){
         if(!m[r][c]) continue;
@@ -649,14 +697,202 @@ function renderRank(){
   document.getElementById('rank-mp-name').textContent = name;
   document.getElementById('rank-mp-record').textContent = `${wins}승 (${rate}%)`;
 }
+let settingsReturnScreen = 'screen-menu';
 document.getElementById('btn-rank').addEventListener('click', ()=>{ renderRank(); showScreen('screen-rank'); });
 document.getElementById('rank-back').addEventListener('click', ()=>{ showScreen('screen-menu'); });
+document.getElementById('btn-settings').addEventListener('click', ()=>{
+  settingsReturnScreen = 'screen-menu';
+  document.getElementById('settings-mute').checked = getBgmMuted();
+  document.getElementById('settings-volume').value = getBgmVolume();
+  document.getElementById('settings-sfx-volume').value = getSfxVolume();
+  showScreen('screen-settings');
+});
+document.getElementById('settings-back').addEventListener('click', ()=>{ showScreen(settingsReturnScreen); });
+document.getElementById('settings-mute').addEventListener('change', (e)=>{
+  setBgmMuted(e.target.checked);
+  applyAllMusicVolumesNow();
+});
+document.getElementById('settings-volume').addEventListener('input', (e)=>{
+  setBgmVolume(parseInt(e.target.value,10));
+  applyAllMusicVolumesNow();
+});
+document.getElementById('settings-sfx-volume').addEventListener('input', (e)=>{
+  setSfxVolume(parseInt(e.target.value,10));
+});
+
+// ---------- 배경음악 (메인~대기실 화면) ----------
+const BGM_FADE_SEC = 3;
+const BGM_GAP_MS = 5000;
+const MUSIC_SCREENS = new Set([
+  'screen-nickname','screen-menu','screen-mp-login','screen-mp-create','screen-mp-join',
+  'screen-mp-lobby','screen-shop','screen-rank','screen-settings'
+]);
+const bgm = new Audio('assets/bgm.mp3');
+bgm.loop = false;
+let bgmGapTimer = null;
+let bgmStarted = false;
+function getBgmVolume(){ const v = parseInt(localStorage.getItem('tb_bgm_volume')||'80',10); return isNaN(v)?80:Math.max(0,Math.min(100,v)); }
+function setBgmVolume(v){ localStorage.setItem('tb_bgm_volume', String(v)); }
+function getBgmMuted(){ return localStorage.getItem('tb_bgm_muted')==='1'; }
+function setBgmMuted(b){ localStorage.setItem('tb_bgm_muted', b?'1':'0'); }
+function bgmBaseVolume(){ return getBgmMuted() ? 0 : getBgmVolume()/100; }
+function applyBgmVolumeNow(){
+  if(!bgm.duration || bgm.paused) { bgm.volume = bgmBaseVolume(); return; }
+  const remain = bgm.duration - bgm.currentTime;
+  let factor = 1;
+  if(bgm.currentTime <= BGM_FADE_SEC) factor = Math.min(factor, bgm.currentTime/BGM_FADE_SEC);
+  if(remain <= BGM_FADE_SEC && remain > 0) factor = Math.min(factor, remain/BGM_FADE_SEC);
+  bgm.volume = bgmBaseVolume() * Math.max(0, factor);
+}
+bgm.addEventListener('timeupdate', applyBgmVolumeNow);
+bgm.addEventListener('ended', ()=>{
+  clearTimeout(bgmGapTimer);
+  bgmGapTimer = setTimeout(()=>{
+    bgm.currentTime = 0;
+    if(MUSIC_SCREENS.has(currentActiveScreenId())) startBgmPlayback();
+  }, BGM_GAP_MS);
+});
+function currentActiveScreenId(){
+  const el = document.querySelector('.screen.active');
+  return el ? el.id : null;
+}
+function startBgmPlayback(){
+  bgm.volume = (bgm.currentTime < 0.5) ? 0 : bgmBaseVolume();
+  bgm.play().then(()=>{ bgmStarted = true; }).catch(()=>{});
+}
+function updateBgmForScreen(id){
+  if(MUSIC_SCREENS.has(id)){
+    if(bgm.paused) startBgmPlayback();
+  } else {
+    clearTimeout(bgmGapTimer);
+    bgm.pause();
+  }
+}
+
+// ---------- 게임 플레이 전용 배경음악 ----------
+const gameBgm = new Audio('assets/game-bgm.mp3');
+gameBgm.loop = false;
+let gameBgmGapTimer = null;
+let gameBgmStarted = false;
+function applyGameBgmVolumeNow(){
+  if(!gameBgm.duration || gameBgm.paused){ gameBgm.volume = bgmBaseVolume(); return; }
+  const remain = gameBgm.duration - gameBgm.currentTime;
+  let factor = 1;
+  if(gameBgm.currentTime <= BGM_FADE_SEC) factor = Math.min(factor, gameBgm.currentTime/BGM_FADE_SEC);
+  if(remain <= BGM_FADE_SEC && remain > 0) factor = Math.min(factor, remain/BGM_FADE_SEC);
+  gameBgm.volume = bgmBaseVolume() * Math.max(0, factor);
+}
+gameBgm.addEventListener('timeupdate', applyGameBgmVolumeNow);
+gameBgm.addEventListener('ended', ()=>{
+  clearTimeout(gameBgmGapTimer);
+  gameBgmGapTimer = setTimeout(()=>{
+    gameBgm.currentTime = 0;
+    if(currentActiveScreenId()==='screen-game') startGameBgmPlayback();
+  }, BGM_GAP_MS);
+});
+function startGameBgmPlayback(){
+  gameBgm.volume = (gameBgm.currentTime < 0.5) ? 0 : bgmBaseVolume();
+  gameBgm.play().then(()=>{ gameBgmStarted = true; }).catch(()=>{});
+}
+function updateGameBgmForScreen(id){
+  if(id === 'screen-game'){
+    if(gameBgm.paused) startGameBgmPlayback();
+  } else {
+    clearTimeout(gameBgmGapTimer);
+    gameBgm.pause();
+  }
+}
+function applyAllMusicVolumesNow(){ applyBgmVolumeNow(); applyGameBgmVolumeNow(); }
+// 브라우저/Electron의 자동재생 제한 대응: 첫 클릭 시 재생 시도
+document.addEventListener('click', function firstInteractionPlay(){
+  const id = currentActiveScreenId();
+  if(!bgmStarted && MUSIC_SCREENS.has(id)) startBgmPlayback();
+  if(!gameBgmStarted && id==='screen-game') startGameBgmPlayback();
+}, { once:false });
+
+// ---------- 효과음 (틱 / 줄삭제 타격감, Web Audio로 직접 합성) ----------
+let sfxCtx = null, sfxMaster = null;
+function ensureSfxCtx(){
+  if(!sfxCtx){
+    sfxCtx = new (window.AudioContext||window.webkitAudioContext)();
+    sfxMaster = sfxCtx.createDynamicsCompressor();
+    sfxMaster.threshold.setValueAtTime(-18, sfxCtx.currentTime);
+    sfxMaster.knee.setValueAtTime(20, sfxCtx.currentTime);
+    sfxMaster.ratio.setValueAtTime(8, sfxCtx.currentTime);
+    sfxMaster.attack.setValueAtTime(0.003, sfxCtx.currentTime);
+    sfxMaster.release.setValueAtTime(0.15, sfxCtx.currentTime);
+    sfxMaster.connect(sfxCtx.destination);
+  }
+  if(sfxCtx.state === 'suspended') sfxCtx.resume().catch(()=>{});
+  return sfxCtx;
+}
+function getSfxVolume(){ const v = parseInt(localStorage.getItem('tb_sfx_volume')||'80',10); return isNaN(v)?80:Math.max(0,Math.min(100,v)); }
+function setSfxVolume(v){ localStorage.setItem('tb_sfx_volume', String(v)); }
+function sfxGain(){ return getSfxVolume()/100; }
+function playTick(){
+  if(sfxGain()<=0) return;
+  const ctx = ensureSfxCtx();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1200, t);
+  osc.frequency.exponentialRampToValueAtTime(850, t+0.03);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.16*sfxGain(), t+0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+0.045);
+  osc.connect(gain); gain.connect(sfxMaster);
+  osc.start(t); osc.stop(t+0.05);
+}
+const LINE_CLEAR_TIERS = {
+  1: { freqStart:300, freqEnd:170, peak:0.20, dur:0.14, noise:0 },
+  2: { freqStart:220, freqEnd:90,  peak:0.30, dur:0.20, noise:0.10 },
+  3: { freqStart:160, freqEnd:55,  peak:0.38, dur:0.30, noise:0.18 },
+};
+function playLineClear(tier){
+  if(sfxGain()<=0) return;
+  const ctx = ensureSfxCtx();
+  const t = ctx.currentTime;
+  const cfg = LINE_CLEAR_TIERS[tier] || LINE_CLEAR_TIERS[1];
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(cfg.freqStart, t);
+  osc.frequency.exponentialRampToValueAtTime(cfg.freqEnd, t+cfg.dur);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(cfg.peak*sfxGain(), t+0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t+cfg.dur);
+  osc.connect(gain); gain.connect(sfxMaster);
+  osc.start(t); osc.stop(t+cfg.dur+0.02);
+  if(cfg.noise>0){
+    const bufferSize = Math.floor(ctx.sampleRate * cfg.dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2500, t);
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(cfg.noise*sfxGain(), t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, t+cfg.dur*0.6);
+    noise.connect(filter); filter.connect(noiseGain); noiseGain.connect(sfxMaster);
+    noise.start(t);
+  }
+}
+function playLineClearForCount(n){
+  if(n<=0) return;
+  playLineClear(n<=2 ? 1 : (n<=4 ? 2 : 3));
+}
 
 // ---------- 화면 전환 ----------
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(id === 'screen-menu') refreshMenuCoinDisplay();
+  updateBgmForScreen(id);
+  updateGameBgmForScreen(id);
 }
 refreshMenuCoinDisplay();
 
@@ -687,12 +923,21 @@ mpServerInput.addEventListener('change', ()=>{
 });
 
 document.getElementById('btn-single').addEventListener('click', ()=>{ showScreen('screen-game'); resetAndStart(); });
-document.getElementById('btn-back-menu').addEventListener('click', ()=>{ stopLoop(); mpDisconnect(); document.getElementById('opp-col').style.display='none'; showScreen('screen-menu'); });
-document.getElementById('btn-pause-menu').addEventListener('click', ()=>{ stopLoop(); mpDisconnect(); document.getElementById('opp-col').style.display='none'; showScreen('screen-menu'); });
 document.getElementById('btn-gameover-menu').addEventListener('click', ()=>{ document.getElementById('opp-col').style.display='none'; showScreen('screen-menu'); });
 document.getElementById('btn-retry').addEventListener('click', ()=>{ resetAndStart(); });
-document.getElementById('btn-pause').addEventListener('click', ()=> togglePause());
-document.getElementById('btn-resume').addEventListener('click', ()=> togglePause());
+document.getElementById('btn-esc-exit').addEventListener('click', ()=>{
+  closeEscMenu();
+  stopLoop(); mpDisconnect(); document.getElementById('opp-col').style.display='none';
+  showScreen('screen-menu');
+});
+document.getElementById('btn-esc-settings').addEventListener('click', ()=>{
+  closeEscMenu();
+  settingsReturnScreen = 'screen-game';
+  document.getElementById('settings-mute').checked = getBgmMuted();
+  document.getElementById('settings-volume').value = getBgmVolume();
+  document.getElementById('settings-sfx-volume').value = getSfxVolume();
+  showScreen('screen-settings');
+});
 
 // ---------- 멀티플레이 네트워킹 ----------
 let mpWS = null, mpPlayerId = null, mpRoomId = null, mpIsHost = false, mpIsPrivateRoom = false, mpMyPassword = '';
@@ -918,6 +1163,7 @@ function mpBeginCountdown(startAt){
 
 function garbageFor(cleared){ return GARBAGE_TABLE[cleared] || 0; }
 function onLinesCleared(cleared){
+  if(cleared>0) playLineClearForCount(cleared);
   if(mpActive && cleared>0){
     const g = garbageFor(cleared);
     if(g>0) mpSend({type:'garbage', amount:g});
@@ -979,7 +1225,7 @@ function startMultiplayerGame(playerList){
   showScreen('screen-game');
   document.getElementById('overlay-gameover').style.display = 'none';
   document.getElementById('overlay-mp-end').style.display = 'none';
-  document.getElementById('overlay-pause').style.display = 'none';
+  closeEscMenu();
   document.getElementById('opp-col').style.display = 'flex';
   setLeftColLayout(true);
   document.getElementById('chat-log').innerHTML = '';
@@ -1026,12 +1272,11 @@ function setLeftColLayout(isMulti){
   if(isMulti){
     left.insertBefore(statsPanel, holdPanel);
     chatPanel.style.display = 'flex';
-    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드';
   } else {
     left.insertBefore(holdPanel, statsPanel);
     chatPanel.style.display = 'none';
-    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 일시정지';
   }
+  document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 메뉴';
 }
 
 // ---- 채팅 ----
@@ -1133,11 +1378,18 @@ function clearLines(e){
   }
   return cleared;
 }
-function tryMove(e, dx, dy){ if(!e.cur||e.gameOver||e.paused) return false; const nx=e.cur.x+dx, ny=e.cur.y+dy; if(collide(e,e.cur.m,nx,ny)) return false; e.cur.x=nx; e.cur.y=ny; return true; }
+function tryMove(e, dx, dy){
+  if(!e.cur||e.gameOver||e.paused) return false;
+  const nx=e.cur.x+dx, ny=e.cur.y+dy;
+  if(collide(e,e.cur.m,nx,ny)) return false;
+  e.cur.x=nx; e.cur.y=ny;
+  playTick();
+  return true;
+}
 function tryRotate(e, dir){
   if(!e.cur||e.gameOver||e.paused) return;
   const m2 = dir>0 ? rotateCW(e.cur.m) : rotateCCW(e.cur.m);
-  for(const k of [0,-1,1,-2,2]){ if(!collide(e, m2, e.cur.x+k, e.cur.y)){ e.cur.m=m2; e.cur.x+=k; return; } }
+  for(const k of [0,-1,1,-2,2]){ if(!collide(e, m2, e.cur.x+k, e.cur.y)){ e.cur.m=m2; e.cur.x+=k; playTick(); return; } }
 }
 function hardDrop(e){
   if(!e.cur||e.gameOver||e.paused) return;
@@ -1150,7 +1402,7 @@ function hardDrop(e){
 }
 function softDropStep(e){
   if(!e.cur||e.gameOver||e.paused) return -1;
-  if(!collide(e, e.cur.m, e.cur.x, e.cur.y+1)){ e.cur.y++; e.score += 1; return -1; }
+  if(!collide(e, e.cur.m, e.cur.x, e.cur.y+1)){ e.cur.y++; e.score += 1; playTick(); return -1; }
   const cleared = lock(e);
   if(!e.gameOver) spawnFromQueue(e);
   return cleared;
@@ -1269,6 +1521,8 @@ let dasDir = null, dasTimer = 0, arrAcc = 0, softAcc = 0;
 
 function onKeyDown(e){
   if(e.repeat) return;
+  if(e.key === 'Escape'){ toggleEscMenu(); return; }
+  if(escMenuOpen) return;
   switch(e.key){
     case 'ArrowLeft': keyState.left = true; dasDir='left'; dasTimer=0; arrAcc=0; tryMove(eng,-1,0); renderAll(); break;
     case 'ArrowRight': keyState.right = true; dasDir='right'; dasTimer=0; arrAcc=0; tryMove(eng,1,0); renderAll(); break;
@@ -1277,7 +1531,6 @@ function onKeyDown(e){
     case 'z': case 'Z': tryRotate(eng,-1); renderAll(); break;
     case 'c': case 'C': case 'Shift': holdPiece(eng); renderAll(); break;
     case ' ': { const cleared = hardDrop(eng); onLinesCleared(cleared); } renderAll(); checkGameOver(); break;
-    case 'Escape': togglePause(); break;
   }
 }
 function onKeyUp(e){
@@ -1347,11 +1600,14 @@ function checkGameOver(){
     }
   }
 }
-function togglePause(){
-  if(!eng || eng.gameOver || mpActive) return;
-  eng.paused = !eng.paused;
-  document.getElementById('overlay-pause').style.display = eng.paused ? 'flex' : 'none';
-  if(!eng.paused){ lastTime = 0; }
+let escMenuOpen = false;
+function toggleEscMenu(){
+  escMenuOpen = !escMenuOpen;
+  document.getElementById('overlay-esc-menu').style.display = escMenuOpen ? 'flex' : 'none';
+}
+function closeEscMenu(){
+  escMenuOpen = false;
+  document.getElementById('overlay-esc-menu').style.display = 'none';
 }
 function stopLoop(){
   running = false;
@@ -1363,7 +1619,7 @@ function stopLoop(){
 function resetAndStart(){
   document.getElementById('overlay-gameover').style.display = 'none';
   document.getElementById('overlay-mp-end').style.display = 'none';
-  document.getElementById('overlay-pause').style.display = 'none';
+  closeEscMenu();
   document.getElementById('opp-col').style.display = 'none';
   setLeftColLayout(false);
   mpActive = false; gameOverHandled = false;
