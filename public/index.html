@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>테트리스 배틀 - 실시간 서버</title>
+<style>
+  :root{
+    --bg: #0b0d17; --panel: #12162a; --panel2: #171c34; --line: #2a3055;
+    --text: #e8eaf5; --dim: #7c82a8; --accent: #ff4d6d; --accent2: #ffd23f;
+    --p1: #ff4d6d; --p2: #4dd6ff; --p3: #ffd23f; --p4: #7cff8f;
+    --good: #4ade80; --bad: #f04452;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background: radial-gradient(1200px 800px at 15% -10%, #1a1f3d 0%, var(--bg) 55%);
+    color:var(--text); font-family:'Courier New', ui-monospace, Consolas, monospace;
+    display:flex; align-items:center; justify-content:center; min-height:100vh; padding:16px;
+  }
+  #app{ width:100%; max-width:1180px; }
+  h1.title{
+    font-size:28px; letter-spacing:4px; text-transform:uppercase; margin:0 0 4px 0; text-align:center;
+    background: linear-gradient(90deg, var(--p1), var(--p2), var(--p3), var(--p4));
+    -webkit-background-clip:text; background-clip:text; color:transparent; font-weight:900;
+  }
+  .subtitle{ text-align:center; color:var(--dim); font-size:12px; margin-bottom:22px; letter-spacing:1px;}
+  .conn-badge{ text-align:center; font-size:10px; margin-bottom:14px; letter-spacing:1px; }
+  .conn-badge.on{ color:var(--good); } .conn-badge.off{ color:var(--bad); }
+  .screen{ display:none; } .screen.active{ display:block; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:24px; max-width:420px; margin:0 auto; }
+  label{ display:block; font-size:11px; color:var(--dim); letter-spacing:1px; margin-bottom:6px; margin-top:16px; text-transform:uppercase;}
+  label:first-child{ margin-top:0; }
+  input[type=text]{ width:100%; background:var(--bg); border:1px solid var(--line); color:var(--text); padding:10px 12px; border-radius:6px; font-family:inherit; font-size:15px; letter-spacing:1px; outline:none; }
+  input[type=text]:focus{ border-color:var(--accent); }
+  .row{ display:flex; gap:10px; } .row > *{ flex:1; }
+  button{ font-family:inherit; cursor:pointer; border:none; border-radius:6px; padding:11px 16px; font-size:13px; letter-spacing:1px; font-weight:700; text-transform:uppercase; transition: transform .08s ease, opacity .15s ease; }
+  button:active{ transform: scale(0.96); } button:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn-main{ background: linear-gradient(90deg,var(--p1),#ff7a90); color:#fff; }
+  .btn-ghost{ background: var(--panel2); color:var(--text); border:1px solid var(--line); }
+  .btn-block{ width:100%; margin-top:20px; }
+  .err{ color:var(--bad); font-size:12px; margin-top:10px; min-height:14px; }
+  .hint{ color:var(--dim); font-size:11px; margin-top:14px; line-height:1.6; text-align:center; }
+  .lobby-code{ text-align:center; font-size:34px; letter-spacing:10px; font-weight:900; color:var(--accent2); margin:6px 0 2px 0; }
+  .lobby-sub{ text-align:center; color:var(--dim); font-size:11px; margin-bottom:18px;}
+  .player-slots{ display:flex; flex-direction:column; gap:8px; margin:16px 0; }
+  .slot{ display:flex; align-items:center; justify-content:space-between; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:10px 14px; }
+  .slot .name{ font-weight:700; display:flex; align-items:center; gap:8px; }
+  .slot .dot{ width:10px; height:10px; border-radius:50%; }
+  .slot.empty{ color:var(--dim); font-style:italic; }
+  .tag{ font-size:10px; padding:3px 8px; border-radius:20px; letter-spacing:1px; }
+  .tag.ready{ background: rgba(74,222,128,.15); color:var(--good); }
+  .tag.wait{ background: rgba(124,130,168,.15); color:var(--dim); }
+  .tag.host{ background: rgba(255,210,63,.15); color:var(--p3); margin-right:6px;}
+  .game-wrap{ display:flex; gap:18px; justify-content:center; align-items:flex-start; flex-wrap:wrap; }
+  .main-col{ display:flex; flex-direction:column; align-items:center; }
+  .side-col{ display:flex; flex-direction:column; gap:12px; width:190px; }
+  .board-frame{ background:#000; border:3px solid var(--line); border-radius:8px; padding:6px; box-shadow: 0 0 40px rgba(255,77,109,.08); }
+  canvas{ display:block; image-rendering:pixelated; }
+  .hud{ display:flex; gap:10px; margin-top:10px; width:100%; max-width:280px; justify-content:space-between; }
+  .hud .box{ background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; text-align:center; flex:1; }
+  .hud .box .l{ font-size:9px; color:var(--dim); letter-spacing:1px; } .hud .box .v{ font-size:16px; font-weight:900; color:var(--accent2); }
+  .next-wrap{ display:flex; align-items:center; gap:10px; margin-top:10px; color:var(--dim); font-size:11px; }
+  .opp-card{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; position:relative; }
+  .opp-card .name{ font-size:12px; font-weight:700; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+  .opp-card .score{ color:var(--dim); font-size:10px; }
+  .opp-card.dead{ opacity:.35; }
+  .opp-card.dead::after{ content:'GAME OVER'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--bad); font-weight:900; background:rgba(0,0,0,.4); border-radius:8px; letter-spacing:1px;}
+  .opp-board{ display:block; margin:0 auto; }
+  .controls-help{ margin-top:14px; font-size:10px; color:var(--dim); text-align:center; line-height:1.8; }
+  .controls-help b{ color:var(--text); }
+  .overlay{ position:fixed; inset:0; background:rgba(5,6,14,.88); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .overlay .card{ text-align:center; }
+  .overlay h2{ font-size:22px; letter-spacing:2px; margin-bottom:6px; }
+  .rank-list{ margin:18px 0; text-align:left; }
+  .rank-row{ display:flex; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+  .rank-row:last-child{ border-bottom:none; }
+  .rank-row .place{ color:var(--accent2); font-weight:900; margin-right:8px; }
+  .countdown-num{ font-size:64px; font-weight:900; text-align:center; color:var(--accent2); }
+  .attack-toast{ position:fixed; top:16px; left:50%; transform:translateX(-50%); background:var(--bad); color:#fff; padding:8px 18px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:1px; z-index:60; opacity:0; transition:opacity .2s; }
+  .attack-toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 class="title">Tetris Battle</h1>
+  <div class="subtitle">4인 온라인 배틀 · 실시간 서버 (WebSocket)</div>
+  <div class="conn-badge off" id="conn-badge">서버 연결 중...</div>
+
+  <div class="screen active" id="screen-login">
+    <div class="card">
+      <label>닉네임</label>
+      <input type="text" id="input-name" maxlength="8" placeholder="예: 홍길동">
+      <label>방 코드 (참가할 때만 입력)</label>
+      <input type="text" id="input-code" maxlength="4" placeholder="예: ABCD" style="text-transform:uppercase">
+      <div class="row" style="margin-top:20px;">
+        <button class="btn-main" id="btn-create">방 만들기</button>
+        <button class="btn-ghost" id="btn-join">참가하기</button>
+      </div>
+      <div class="err" id="login-err"></div>
+      <div class="hint">최대 4명까지 참가할 수 있어요. 같은 서버 주소로 접속한 사람끼리만 매칭돼요.</div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-lobby">
+    <div class="card" style="max-width:460px;">
+      <div class="lobby-code" id="lobby-code">----</div>
+      <div class="lobby-sub">이 코드를 친구들에게 공유하세요 (최대 4인)</div>
+      <div class="player-slots" id="lobby-slots"></div>
+      <button class="btn-main btn-block" id="btn-ready">준비 완료</button>
+      <button class="btn-main btn-block" id="btn-start" style="display:none; background:linear-gradient(90deg,var(--good),#22c55e);">게임 시작 (호스트)</button>
+      <button class="btn-ghost btn-block" id="btn-leave" style="margin-top:8px;">나가기</button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-game">
+    <div class="game-wrap">
+      <div class="main-col">
+        <div class="board-frame"><canvas id="main-canvas" width="240" height="480"></canvas></div>
+        <div class="hud">
+          <div class="box"><div class="l">SCORE</div><div class="v" id="hud-score">0</div></div>
+          <div class="box"><div class="l">LINES</div><div class="v" id="hud-lines">0</div></div>
+          <div class="box"><div class="l">LV</div><div class="v" id="hud-level">1</div></div>
+        </div>
+        <div class="next-wrap">NEXT <canvas id="next-canvas" width="64" height="64"></canvas></div>
+        <div class="controls-help"><b>←/→</b> 이동 &nbsp; <b>↓</b> 소프트드롭 &nbsp; <b>↑</b> 회전 &nbsp; <b>Z</b> 반대회전 &nbsp; <b>Space</b> 하드드롭</div>
+      </div>
+      <div class="side-col" id="opp-container"></div>
+    </div>
+  </div>
+</div>
+
+<div class="attack-toast" id="attack-toast"></div>
+<div class="overlay" id="overlay-countdown" style="display:none;">
+  <div><div class="countdown-num" id="countdown-num">3</div><div style="text-align:center;color:var(--dim);letter-spacing:2px;font-size:12px;">게임 시작까지</div></div>
+</div>
+<div class="overlay" id="overlay-end" style="display:none;">
+  <div class="card">
+    <h2 id="end-title">게임 종료</h2>
+    <div style="color:var(--dim);font-size:12px;" id="end-sub"></div>
+    <div class="rank-list" id="rank-list"></div>
+    <button class="btn-main btn-block" id="btn-again">로비로 돌아가기</button>
+  </div>
+</div>
+
+<script>
+(function(){
+const COLS=10, ROWS=20;
+const COLORS = { I:'#4dd6ff', O:'#ffd23f', T:'#c07bff', S:'#7cff8f', Z:'#ff4d6d', J:'#5b7bff', L:'#ff9d4d', G:'#5a5f7a' };
+const PLAYER_COLORS = ['#ff4d6d','#4dd6ff','#ffd23f','#7cff8f'];
+const SHAPES = {
+  I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O: [[1,1],[1,1]],
+  T: [[0,1,0],[1,1,1],[0,0,0]], S: [[0,1,1],[1,1,0],[0,0,0]],
+  Z: [[1,1,0],[0,1,1],[0,0,0]], J: [[1,0,0],[1,1,1],[0,0,0]], L: [[0,0,1],[1,1,1],[0,0,0]],
+};
+const TYPES = Object.keys(SHAPES);
+function rotateCW(m){ const n=m.length; const r=Array.from({length:n},()=>Array(n).fill(0)); for(let y=0;y<n;y++) for(let x=0;x<n;x++) r[y][x]=m[n-1-x][y]; return r; }
+function rotateCCW(m){ const n=m.length; const r=Array.from({length:n},()=>Array(n).fill(0)); for(let y=0;y<n;y++) for(let x=0;x<n;x++) r[y][x]=m[x][n-1-y]; return r; }
+function bag7(){ const a=TYPES.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------- 네트워크 ----------
+const S = { ws:null, playerId:null, name:'', roomCode:null, isHost:false, otherIds:[], gameActive:false, endHandled:false, gravityTimer:null };
+let others = {};
+
+function connectWS(){
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host);
+  S.ws = ws;
+  ws.addEventListener('open', ()=>{ setConn(true); });
+  ws.addEventListener('close', ()=>{ setConn(false); setTimeout(connectWS, 1500); });
+  ws.addEventListener('error', ()=>{});
+  ws.addEventListener('message', (ev)=>{
+    let msg; try{ msg = JSON.parse(ev.data); }catch(e){ return; }
+    handleServerMessage(msg);
+  });
+}
+function setConn(on){
+  const b = document.getElementById('conn-badge');
+  b.textContent = on ? '● 서버 연결됨' : '● 서버 연결 끊김, 재접속 중...';
+  b.className = 'conn-badge ' + (on?'on':'off');
+}
+function wsSend(obj){ if(S.ws && S.ws.readyState===1) S.ws.send(JSON.stringify(obj)); }
+
+function handleServerMessage(msg){
+  switch(msg.type){
+    case 'created':
+      S.roomCode = msg.code; S.playerId = msg.playerId; S.isHost = true; enterLobby(); break;
+    case 'joined':
+      S.roomCode = msg.code; S.playerId = msg.playerId; S.isHost = false; enterLobby(); break;
+    case 'error':
+      document.getElementById('login-err').textContent = msg.message; break;
+    case 'lobby':
+      renderLobby(msg); break;
+    case 'countdown':
+      beginCountdown(msg.startAt); break;
+    case 'gameStart':
+      startGame(msg.players); break;
+    case 'opponentState':
+      applyOpponentState(msg); break;
+    case 'garbage':
+      incomingGarbage(msg.amount, msg.from); break;
+    case 'end':
+      endGame(msg.ranking); break;
+  }
+}
+
+// ---------- 로그인 ----------
+const elName = document.getElementById('input-name');
+const elCode = document.getElementById('input-code');
+const elLoginErr = document.getElementById('login-err');
+
+document.getElementById('btn-create').addEventListener('click', ()=>{
+  const name = elName.value.trim();
+  if(!name){ elLoginErr.textContent='닉네임을 입력해주세요.'; return; }
+  elLoginErr.textContent=''; S.name=name;
+  wsSend({type:'create', name});
+});
+document.getElementById('btn-join').addEventListener('click', ()=>{
+  const name = elName.value.trim();
+  const code = elCode.value.trim().toUpperCase();
+  if(!name){ elLoginErr.textContent='닉네임을 입력해주세요.'; return; }
+  if(!code || code.length!==4){ elLoginErr.textContent='4자리 방 코드를 입력해주세요.'; return; }
+  elLoginErr.textContent=''; S.name=name;
+  wsSend({type:'join', code, name});
+});
+
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+function enterLobby(){
+  document.getElementById('lobby-code').textContent = S.roomCode;
+  showScreen('screen-lobby');
+}
+function renderLobby(msg){
+  S.isHost = (msg.hostId === S.playerId);
+  document.getElementById('btn-start').style.display = S.isHost ? 'block' : 'none';
+  const slotsEl = document.getElementById('lobby-slots');
+  slotsEl.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const p = msg.players[i];
+    const div = document.createElement('div');
+    if(p){
+      div.className='slot';
+      const isHost = msg.hostId===p.id;
+      div.innerHTML = `<div class="name"><span class="dot" style="background:${PLAYER_COLORS[i]}"></span>${escapeHtml(p.name)}${p.id===S.playerId?' (나)':''}</div>
+        <div>${isHost?'<span class="tag host">HOST</span>':''}<span class="tag ${p.ready?'ready':'wait'}">${p.ready?'준비완료':'대기중'}</span></div>`;
+    } else { div.className='slot empty'; div.textContent='빈 자리'; }
+    slotsEl.appendChild(div);
+  }
+  const btnStart = document.getElementById('btn-start');
+  const allReady = msg.players.length>=2 && msg.players.every(p=>p.ready);
+  btnStart.disabled = !allReady;
+  btnStart.textContent = allReady ? '게임 시작 (호스트)' : `게임 시작 (전원 준비 필요, ${msg.players.filter(p=>p.ready).length}/${msg.players.length})`;
+}
+document.getElementById('btn-ready').addEventListener('click', (e)=>{
+  const willReady = e.target.textContent.includes('완료');
+  wsSend({type:'ready', ready: willReady});
+  e.target.textContent = willReady ? '준비 취소' : '준비 완료';
+});
+document.getElementById('btn-start').addEventListener('click', ()=>{ wsSend({type:'start'}); });
+document.getElementById('btn-leave').addEventListener('click', ()=>{ location.reload(); });
+document.getElementById('btn-again').addEventListener('click', ()=>{ location.reload(); });
+
+function beginCountdown(startAt){
+  document.getElementById('overlay-countdown').style.display='flex';
+  const numEl = document.getElementById('countdown-num');
+  const t = setInterval(()=>{
+    const remain = Math.ceil((startAt - Date.now())/1000);
+    numEl.textContent = remain>0 ? remain : 'GO!';
+    if(remain<=0){ clearInterval(t); document.getElementById('overlay-countdown').style.display='none'; }
+  }, 200);
+}
+
+// ---------- 테트리스 엔진 (클라이언트 시뮬레이션) ----------
+function newEngine(){
+  return { board: Array.from({length:ROWS}, ()=>Array(COLS).fill(0)), bag: bag7(), bagIdx:0, cur:null, score:0, lines:0, level:1, gameOver:false };
+}
+function nextType(eng){ if(eng.bagIdx>=eng.bag.length){ eng.bag=bag7(); eng.bagIdx=0; } return eng.bag[eng.bagIdx++]; }
+function peekType(eng){ if(eng.bagIdx>=eng.bag.length) return eng.bag[0]; return eng.bag[eng.bagIdx]; }
+function spawn(eng){
+  const type = nextType(eng); const m = SHAPES[type].map(r=>r.slice()); const size=m.length;
+  const x = Math.floor((COLS-size)/2);
+  eng.cur = { type, m, x, y:-1, color: COLORS[type] };
+  if(collide(eng, eng.cur.m, eng.cur.x, eng.cur.y)) eng.gameOver = true;
+}
+function collide(eng, m, x, y){
+  const n=m.length;
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    if(!m[r][c]) continue;
+    const bx=x+c, by=y+r;
+    if(bx<0||bx>=COLS||by>=ROWS) return true;
+    if(by>=0 && eng.board[by][bx]) return true;
+  }
+  return false;
+}
+function lock(eng){
+  const {m,x,y,color}=eng.cur; const n=m.length;
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(!m[r][c]) continue; const bx=x+c, by=y+r; if(by>=0&&by<ROWS&&bx>=0&&bx<COLS) eng.board[by][bx]=color; }
+  const cleared = clearLines(eng); eng.cur = null; return cleared;
+}
+function clearLines(eng){
+  let cleared=0;
+  for(let r=ROWS-1;r>=0;r--){
+    if(eng.board[r].every(c=>c)){ eng.board.splice(r,1); eng.board.unshift(Array(COLS).fill(0)); cleared++; r++; }
+  }
+  if(cleared>0){ eng.lines+=cleared; const table={1:100,2:300,3:500,4:800}; eng.score += (table[cleared]||0)*eng.level; eng.level = 1+Math.floor(eng.lines/10); }
+  return cleared;
+}
+function garbageFor(cleared){ return {1:0,2:1,3:2,4:4}[cleared] || 0; }
+function addGarbage(eng, n){
+  if(n<=0) return; let overflow=false;
+  for(let i=0;i<n;i++){
+    if(eng.board[0].some(c=>c)) overflow=true;
+    eng.board.shift();
+    const gapCol = Math.floor(Math.random()*COLS);
+    const row = Array(COLS).fill(COLORS.G); row[gapCol]=0;
+    eng.board.push(row);
+  }
+  if(overflow) eng.gameOver = true;
+}
+function tryMove(eng, dx, dy){ if(!eng.cur||eng.gameOver) return false; const nx=eng.cur.x+dx, ny=eng.cur.y+dy; if(collide(eng, eng.cur.m, nx, ny)) return false; eng.cur.x=nx; eng.cur.y=ny; return true; }
+function tryRotate(eng, dir){
+  if(!eng.cur||eng.gameOver) return;
+  const m2 = dir>0 ? rotateCW(eng.cur.m) : rotateCCW(eng.cur.m);
+  for(const k of [0,-1,1,-2,2]){ if(!collide(eng, m2, eng.cur.x+k, eng.cur.y)){ eng.cur.m=m2; eng.cur.x+=k; return; } }
+}
+function hardDrop(eng){ if(!eng.cur||eng.gameOver) return 0; while(!collide(eng, eng.cur.m, eng.cur.x, eng.cur.y+1)) eng.cur.y++; return lock(eng); }
+function softTick(eng){
+  if(!eng.cur||eng.gameOver) return {locked:false, cleared:0};
+  if(!collide(eng, eng.cur.m, eng.cur.x, eng.cur.y+1)){ eng.cur.y++; return {locked:false, cleared:0}; }
+  const cleared = lock(eng); return {locked:true, cleared};
+}
+
+// ---------- 렌더링 ----------
+const mainCanvas = document.getElementById('main-canvas'); const mctx = mainCanvas.getContext('2d');
+const nextCanvas = document.getElementById('next-canvas'); const nctx = nextCanvas.getContext('2d');
+const CELL = 24;
+function drawBoard(ctx, eng, cell){
+  const w=COLS*cell, h=ROWS*cell;
+  ctx.fillStyle='#05060d'; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='rgba(255,255,255,0.04)';
+  for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*cell,0); ctx.lineTo(x*cell,h); ctx.stroke(); }
+  for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*cell); ctx.lineTo(w,y*cell); ctx.stroke(); }
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ if(eng.board[r][c]) drawCell(ctx,c,r,eng.board[r][c],cell); }
+  if(eng.cur){ const {m,x,y,color}=eng.cur; for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){ if(m[r][c] && y+r>=0) drawCell(ctx,x+c,y+r,color,cell); } }
+}
+function drawCell(ctx, cx, cy, color, cell){
+  const px=cx*cell, py=cy*cell;
+  ctx.fillStyle=color; ctx.fillRect(px+1,py+1,cell-2,cell-2);
+  ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.fillRect(px+1,py+1,cell-2,3);
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(px+1,py+cell-4,cell-2,3);
+}
+function drawNext(eng){
+  nctx.fillStyle='#05060d'; nctx.fillRect(0,0,64,64);
+  const type = peekType(eng); const m = SHAPES[type]; const n=m.length; const cell=14;
+  const offx=(64-n*cell)/2, offy=(64-n*cell)/2;
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(m[r][c]){ nctx.fillStyle=COLORS[type]; nctx.fillRect(offx+c*cell+1, offy+r*cell+1, cell-2, cell-2); } }
+}
+
+// ---------- 게임 진행 ----------
+let myEngine = null;
+
+function startGame(playerList){
+  document.getElementById('overlay-countdown').style.display='none';
+  showScreen('screen-game');
+  myEngine = newEngine(); spawn(myEngine);
+  S.otherIds = playerList.filter(p=>p.id!==S.playerId).map(p=>p.id);
+  const oppContainer = document.getElementById('opp-container');
+  oppContainer.innerHTML=''; others = {};
+  playerList.forEach((p,i)=>{
+    if(p.id===S.playerId) return;
+    others[p.id] = { name:p.name, color: PLAYER_COLORS[i%4], alive:true, score:0 };
+    const card = document.createElement('div');
+    card.className='opp-card'; card.id='opp-'+p.id;
+    card.innerHTML = `<div class="name"><span>${escapeHtml(p.name)}</span><span class="score" id="opp-score-${p.id}">0</span></div>
+      <canvas class="opp-board" id="opp-board-${p.id}" width="90" height="180"></canvas>`;
+    oppContainer.appendChild(card);
+  });
+  S.gameActive = true; S.endHandled = false;
+  render(); drawNext(myEngine);
+  document.addEventListener('keydown', onKeyDown);
+  scheduleGravity();
+  clearInterval(S.writeTimer);
+  S.writeTimer = setInterval(sendMyState, 250);
+  sendMyState();
+}
+
+function scheduleGravity(){
+  if(S.gravityTimer) clearInterval(S.gravityTimer);
+  const interval = Math.max(120, 800 - (myEngine.level-1)*65);
+  S.gravityTimer = setInterval(()=>{
+    if(!S.gameActive || myEngine.gameOver) return;
+    const res = softTick(myEngine);
+    if(res.locked){
+      handleClearedLines(res.cleared);
+      spawn(myEngine); drawNext(myEngine); scheduleGravity();
+      if(myEngine.gameOver) sendMyState();
+    }
+    render();
+  }, interval);
+}
+function handleClearedLines(cleared){ const g = garbageFor(cleared); if(g>0) wsSend({type:'garbage', amount:g}); }
+function incomingGarbage(amount, from){
+  if(!S.gameActive || myEngine.gameOver) return;
+  addGarbage(myEngine, amount);
+  render();
+  showAttackToast(`⚠ ${from}님의 공격! +${amount}줄`);
+  if(myEngine.gameOver) sendMyState();
+}
+function showAttackToast(text){
+  const t = document.getElementById('attack-toast');
+  t.textContent = text; t.classList.add('show');
+  clearTimeout(t._timer); t._timer = setTimeout(()=>t.classList.remove('show'), 1500);
+}
+function sendMyState(){
+  wsSend({
+    type:'state', score: myEngine.score, lines: myEngine.lines, alive: !myEngine.gameOver,
+    boardFlat: myEngine.board.map(row=>row.map(c=>c?'1':'0').join('')).join('|')
+  });
+}
+function applyOpponentState(msg){
+  const info = others[msg.id]; if(!info) return;
+  info.alive = msg.alive; info.score = msg.score;
+  const card = document.getElementById('opp-'+msg.id); if(!card) return;
+  card.classList.toggle('dead', !info.alive);
+  document.getElementById('opp-score-'+msg.id).textContent = info.score;
+  const canvas = document.getElementById('opp-board-'+msg.id); if(!canvas) return;
+  const ctx = canvas.getContext('2d'); const cell=9;
+  ctx.fillStyle='#05060d'; ctx.fillRect(0,0,COLS*cell,ROWS*cell);
+  const rows = msg.boardFlat.split('|');
+  for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle=info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
+}
+function endGame(ranking){
+  if(S.endHandled) return; S.endHandled = true;
+  S.gameActive = false;
+  clearInterval(S.gravityTimer); clearInterval(S.writeTimer);
+  document.removeEventListener('keydown', onKeyDown);
+  const iWon = ranking.length>0 && ranking[0].id===S.playerId && ranking[0].alive;
+  document.getElementById('end-title').textContent = iWon ? '🏆 승리했습니다!' : '게임 종료';
+  document.getElementById('end-sub').textContent = iWon ? '마지막까지 살아남았어요.' : '다음엔 더 잘할 수 있어요.';
+  const listEl = document.getElementById('rank-list');
+  listEl.innerHTML = ranking.map((r,i)=>`<div class="rank-row"><span><span class="place">${i+1}위</span>${escapeHtml(r.name)}${r.id===S.playerId?' (나)':''}</span><span>${r.score}점</span></div>`).join('');
+  document.getElementById('overlay-end').style.display='flex';
+}
+function render(){
+  drawBoard(mctx, myEngine, CELL);
+  document.getElementById('hud-score').textContent = myEngine.score;
+  document.getElementById('hud-lines').textContent = myEngine.lines;
+  document.getElementById('hud-level').textContent = myEngine.level;
+}
+function onKeyDown(e){
+  if(!S.gameActive || !myEngine || myEngine.gameOver) return;
+  switch(e.key){
+    case 'ArrowLeft': tryMove(myEngine,-1,0); render(); e.preventDefault(); break;
+    case 'ArrowRight': tryMove(myEngine,1,0); render(); e.preventDefault(); break;
+    case 'ArrowDown':
+      if(!tryMove(myEngine,0,1)){ const cleared=lock(myEngine); handleClearedLines(cleared); spawn(myEngine); drawNext(myEngine); scheduleGravity(); }
+      else { myEngine.score += 1; }
+      render(); e.preventDefault(); break;
+    case 'ArrowUp': tryRotate(myEngine,1); render(); e.preventDefault(); break;
+    case 'z': case 'Z': tryRotate(myEngine,-1); render(); break;
+    case ' ':
+      { const cleared = hardDrop(myEngine); handleClearedLines(cleared);
+        if(!myEngine.gameOver){ spawn(myEngine); drawNext(myEngine); scheduleGravity(); } else { sendMyState(); }
+        render(); }
+      e.preventDefault(); break;
+  }
+}
+
+connectWS();
+})();
+</script>
+</body>
+</html>
