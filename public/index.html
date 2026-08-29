@@ -280,7 +280,7 @@
     position:absolute; left:100%; right:auto; top:50%; transform:translateY(-50%); margin-left:10px;
   }
   .mp-wait-banner{
-    display:flex; justify-content:space-between; align-items:center; width:100%; max-width:900px;
+    display:flex; justify-content:space-between; align-items:center; width:100%; max-width:1100px;
     background:var(--panel); border:1px solid var(--cyan); border-radius:10px; padding:14px 22px; margin-bottom:14px;
     font-size:15px; font-weight:700;
   }
@@ -296,6 +296,9 @@
 
   .opp-col-grid{ display:flex; flex-direction:column; gap:8px; width:280px; }
   .opp-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  #territory-opp-grid{ grid-template-columns:repeat(3,1fr); width:100%; }
+  #territory-opp-grid .opp-slot{ min-height:auto; padding:4px; }
+  #territory-opp-grid .opp-name{ font-size:9px; }
   .opp-slot{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px; position:relative; }
   .opp-slot.empty{ background:var(--bg2); border:1px dashed var(--line); opacity:.5; min-height:266px; display:flex; align-items:center; justify-content:center; position:relative; }
   .bot-add-btn{
@@ -487,7 +490,7 @@
     <select id="mp-mode-select" class="mp-select">
       <option value="classic2">클래식 (2인)</option>
       <option value="classic5">클래식 (5인)</option>
-      <option value="territory">땅따먹기 (4인, 2인도 가능)</option>
+      <option value="territory">땅따먹기 (4인)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -589,6 +592,11 @@
           <div class="overlay" id="overlay-mp-countdown" style="display:none;">
             <div class="countdown-num" id="mp-countdown-num">3</div>
           </div>
+          <div class="overlay" id="overlay-freeze" style="display:none;">
+            <h2 style="color:var(--bad);">패널티!</h2>
+            <div class="countdown-num" id="freeze-num" style="color:var(--bad);">5</div>
+            <div class="sub">블록이 최상단에 닿았어요. 잠시 후 보드가 초기화돼요.</div>
+          </div>
           <div class="overlay" id="overlay-esc-menu" style="display:none;">
             <h2>메뉴</h2>
             <div class="overlay-btns">
@@ -652,6 +660,7 @@
         <div class="territory-timer" id="territory-timer">03:00</div>
         <canvas id="territory-canvas" width="280" height="280"></canvas>
         <div class="territory-legend" id="territory-legend"></div>
+        <div class="opp-grid" id="territory-opp-grid"></div>
       </div>
     </div>
   </div>
@@ -1271,6 +1280,12 @@ function mpRefreshRoomList(){
 }
 document.getElementById('mp-refresh').addEventListener('click', mpRefreshRoomList);
 
+function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; return 5; }
+function mpModeLabel(mode){
+  if(mode === 'territory') return '땅따먹기';
+  if(mode === 'classic2') return '클래식(2인)';
+  return '클래식(5인)';
+}
 function mpRenderRoomList(rooms){
   const listEl = document.getElementById('mp-room-list');
   if(!rooms || rooms.length===0){ listEl.innerHTML = '<div class="mp-room-empty">열려있는 방이 없어요.</div>'; return; }
@@ -1282,7 +1297,8 @@ function mpRenderRoomList(rooms){
     const statusBadge = isPlaying
       ? '<span class="mp-lock-badge" style="background:rgba(255,206,69,.15); color:var(--yellow);">게임중</span>'
       : (r.isPrivate ? '<span class="mp-lock-badge">🔒 비공개</span>' : '<span class="mp-lock-badge" style="background:rgba(82,255,157,.15); color:var(--good);">공개</span>');
-    row.innerHTML = `<span class="rn">${statusBadge} ${mpEscapeHtml(r.title || (r.hostName + '의 방'))}</span><span class="rc">${r.count}/${r.max}${isPlaying ? ' · 관전가능' : ''}</span>`;
+    const modeBadge = `<span class="mp-lock-badge" style="background:rgba(61,219,255,.12); color:var(--cyan);">${mpModeLabel(r.mode)}</span>`;
+    row.innerHTML = `<span class="rn">${statusBadge} ${modeBadge} ${mpEscapeHtml(r.title || (r.hostName + '의 방'))}</span><span class="rc">${r.count}/${r.max}${isPlaying ? ' · 관전가능' : ''}</span>`;
     row.addEventListener('dblclick', ()=>{
       if(isPlaying) mpTrySpectateRoom(r.roomId, r.isPrivate);
       else mpTryJoinRoom(r.roomId, r.isPrivate);
@@ -1448,7 +1464,7 @@ function mpBuildOppSlots(mode, players){
     const grid = document.getElementById('opp-grid');
     grid.innerHTML = '';
     mpOtherIds = others.map(p=>p.id);
-    for(let i=0;i<4;i++){
+    for(let i=0;i<mpModeMax(mode)-1;i++){
       const p = others[i];
       const slot = document.createElement('div');
       if(p){
@@ -1549,6 +1565,7 @@ function onLinesCleared(cleared, tspin, combo){
     if(mpRoomMode === 'territory'){
       const captureAmount = Math.min(total, 6); // 한 번에 너무 많은 땅을 먹지 않도록 상한
       if(captureAmount>0) mpSend({type:'territoryCapture', amount: captureAmount});
+      if(total>0) mpSend({type:'garbage', amount: total});
     } else if(total>0){
       mpSend({type:'garbage', amount: total});
     }
@@ -1563,6 +1580,15 @@ function showComboToast(combo){
   clearTimeout(comboToastTimer);
   comboToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 1100);
 }
+function triggerGameOverOrFreeze(e){
+  if(mpActive && mpRoomMode === 'territory'){
+    e.frozen = true;
+    e.frozenUntil = Date.now() + 5000;
+    e.cur = null;
+  } else {
+    e.gameOver = true;
+  }
+}
 function addGarbage(e, amount){
   if(amount<=0) return;
   for(let i=0;i<amount;i++){
@@ -1573,11 +1599,11 @@ function addGarbage(e, amount){
     e.board.push(row);
   }
   if(e.cur && collide(e, e.cur.m, e.cur.x, e.cur.y)){
-    e.gameOver = true;
+    triggerGameOverOrFreeze(e);
   }
 }
 function mpIncomingGarbage(amount, from){
-  if(!mpActive || eng.gameOver) return;
+  if(!mpActive || eng.gameOver || eng.frozen) return;
   addGarbage(eng, amount);
   renderAll();
   checkGameOver();
@@ -1613,7 +1639,7 @@ function mpApplyOpponentState(msg){
     slot.classList.toggle('dead', !info.alive);
     const scoreEl = document.getElementById('opp-score-'+msg.id); if(scoreEl) scoreEl.textContent = info.score;
     const canvas = document.getElementById('opp-board-'+msg.id); if(!canvas) return;
-    const ctx = canvas.getContext('2d'); const cell = 12;
+    const ctx = canvas.getContext('2d'); const cell = canvas.width / COLS;
     ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,COLS*cell,ROWS*cell);
     const rows = msg.boardFlat.split('|');
     for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
@@ -1646,6 +1672,7 @@ function mpEndGame(ranking, mode, noCoins, noCoinIds){
     (coinsWon>0 ? `<div style="color:var(--yellow); margin-top:6px;">🪙 +${coinsWon} 코인 획득!</div>` : (noCoins ? `<div style="color:var(--dim); font-size:11px; font-weight:400; margin-top:6px;">1분 이내 종료된 게임은 코인이 지급되지 않아요.</div>` : ''))
   );
   mpShowWaitingVisuals();
+  updateGameBgmForScreen('screen-game');
 }
 function mpEndTerritoryMatch(ranking, humanCount, noCoinIds){
   mpMatchStarted = false;
@@ -1667,6 +1694,7 @@ function mpEndTerritoryMatch(ranking, humanCount, noCoinIds){
     (coinsWon>0 ? `<div style="color:var(--yellow); margin-top:6px;">🪙 +${coinsWon} 코인 획득!</div>` : '')
   );
   mpShowWaitingVisuals();
+  updateGameBgmForScreen('screen-game');
 }
 
 let mpLayoutMode = 'single'; // 'single'(2인) | 'grid'(3~5인)
@@ -1707,6 +1735,16 @@ function startMultiplayerGame(msg){
     }
     mpRenderTerritoryLegend();
     mpStartTerritoryTimer(msg.territoryEndAt);
+    mpLayoutMode = 'grid';
+    const territoryOppGrid = document.getElementById('territory-opp-grid');
+    territoryOppGrid.innerHTML = '';
+    playerList.filter(p=>p.id!==mpPlayerId).forEach(p=>{
+      const slot = document.createElement('div');
+      slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
+      slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.isBot?' 🤖':''}</span><span class="opp-score" id="opp-score-${p.id}">0</span></div>
+        <canvas id="opp-board-${p.id}" width="80" height="160"></canvas>`;
+      territoryOppGrid.appendChild(slot);
+    });
   } else {
     mpBuildOppSlots(mpRoomMode, playerList);
   }
@@ -1884,7 +1922,7 @@ function newEngine(){
     board: Array.from({length:ROWS}, ()=>Array(COLS).fill(0)),
     queue: [], held: null, holdUsed: false,
     cur: null, score:0, lines:0, level:1, gameOver:false, paused:false,
-    combo:0, lastMoveWasRotation:false,
+    combo:0, lastMoveWasRotation:false, frozen:false, frozenUntil:0,
   };
 }
 function ensureQueue(e){ while(e.queue.length < 6) e.queue.push(...bag7()); }
@@ -1897,7 +1935,7 @@ function spawnFromQueue(e){
   const x = Math.floor((COLS-size)/2);
   e.cur = { type, m, x, y:-1 };
   e.lastMoveWasRotation = false;
-  if(collide(e, e.cur.m, e.cur.x, e.cur.y)) e.gameOver = true;
+  if(collide(e, e.cur.m, e.cur.x, e.cur.y)) triggerGameOverOrFreeze(e);
 }
 function collide(e, m, x, y){
   const n=m.length;
@@ -2116,6 +2154,7 @@ function onKeyDown(e){
   if(e.key === 'Escape'){ toggleEscMenu(); return; }
   if(escMenuOpen) return;
   if(mpActive && !mpMatchStarted) return;
+  if(eng && eng.frozen) return;
   switch(e.key){
     case 'ArrowLeft': keyState.left = true; dasDir='left'; dasTimer=0; arrAcc=0; tryMove(eng,-1,0); renderAll(); break;
     case 'ArrowRight': keyState.right = true; dasDir='right'; dasTimer=0; arrAcc=0; tryMove(eng,1,0); renderAll(); break;
@@ -2154,6 +2193,20 @@ function loop(ts){
   if(dt > 250) dt = 250; // 탭 비활성화 후 복귀 등으로 dt가 비정상적으로 커지는 것을 방지 (급격한 낙하 몰림/렉 예방)
 
   if(!eng.paused && !eng.gameOver){
+    if(eng.frozen){
+      if(Date.now() >= eng.frozenUntil){
+        eng.board = Array.from({length:ROWS}, ()=>Array(COLS).fill(0));
+        eng.frozen = false;
+        eng.combo = 0;
+        hideFreezeOverlay();
+        spawnFromQueue(eng);
+      } else {
+        updateFreezeOverlay(eng.frozenUntil);
+      }
+      renderAll();
+      rafId = requestAnimationFrame(loop);
+      return;
+    }
     if(dasDir){
       dasTimer += dt;
       if(dasTimer >= DAS){
@@ -2174,7 +2227,8 @@ function loop(ts){
         const cleared = lock(eng);
         eng.combo = cleared>0 ? (eng.combo||0)+1 : 0;
         onLinesCleared(cleared, tspin, eng.combo);
-        if(!eng.gameOver) spawnFromQueue(eng);
+        if(!eng.gameOver && !eng.frozen) spawnFromQueue(eng);
+        if(eng.frozen){ renderAll(); rafId = requestAnimationFrame(loop); return; }
       }
       gravityAcc -= gi;
       checkGameOver();
@@ -2182,6 +2236,15 @@ function loop(ts){
     renderAll();
   }
   rafId = requestAnimationFrame(loop);
+}
+function updateFreezeOverlay(frozenUntil){
+  const el = document.getElementById('overlay-freeze');
+  el.style.display = 'flex';
+  const remain = Math.max(0, Math.ceil((frozenUntil - Date.now())/1000));
+  document.getElementById('freeze-num').textContent = remain;
+}
+function hideFreezeOverlay(){
+  document.getElementById('overlay-freeze').style.display = 'none';
 }
 function checkGameOver(){
   if(eng.gameOver && !gameOverHandled){
