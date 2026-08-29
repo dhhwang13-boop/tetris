@@ -61,15 +61,18 @@ function lobbyPayload(room) {
     players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready }))
   };
 }
+const MAX_PLAYERS = 5;
+const DEFAULT_ROOM_TITLES = ['즐거운 게임해요!', '테트리스 초보만!', '매너게임 부탁합니다!', 'glhf'];
+
 function roomListPayload() {
   const list = [...rooms.values()]
-    .filter(r => r.status === 'lobby' && r.players.size < 4)
+    .filter(r => r.status === 'lobby' && r.players.size < MAX_PLAYERS)
     .map(r => ({
       roomId: r.id,
       title: r.title || null,
       hostName: (r.players.get(r.hostId) || {}).name || '플레이어',
       count: r.players.size,
-      max: 4,
+      max: MAX_PLAYERS,
       isPrivate: r.isPrivate
     }));
   return { type: 'roomList', rooms: list };
@@ -105,7 +108,7 @@ wss.on('connection', (ws) => {
       const isPrivate = !!msg.isPrivate;
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
-      const title = String(msg.roomTitle || '').slice(0, 20) || null;
+      const title = String(msg.roomTitle || '').trim().slice(0, 20) || DEFAULT_ROOM_TITLES[Math.floor(Math.random() * DEFAULT_ROOM_TITLES.length)];
       const room = { id, title, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
       room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0 });
       rooms.set(id, room);
@@ -120,7 +123,7 @@ wss.on('connection', (ws) => {
       const room = rooms.get(id);
       if (!room) { send(ws, { type: 'error', message: '해당 방을 찾을 수 없어요. 목록을 새로고침해보세요.' }); return; }
       if (room.status !== 'lobby') { send(ws, { type: 'error', message: '이미 게임이 진행 중인 방이에요.' }); return; }
-      if (room.players.size >= 4) { send(ws, { type: 'error', message: '방이 가득 찼어요 (최대 4인).' }); return; }
+      if (room.players.size >= MAX_PLAYERS) { send(ws, { type: 'error', message: '방이 가득 찼어요 (최대 5인).' }); return; }
       if (room.isPrivate && String(msg.password || '') !== room.password) {
         send(ws, { type: 'error', message: '코드가 올바르지 않아요.' });
         return;
@@ -154,6 +157,7 @@ wss.on('connection', (ws) => {
       setTimeout(() => {
         if (room.status !== 'starting') return;
         room.status = 'playing';
+        room.startCount = room.players.size;
         for (const p of room.players.values()) { p.alive = true; p.score = 0; p.lines = 0; }
         const playerList = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name }));
         broadcast(room, { type: 'gameStart', players: playerList });
@@ -213,7 +217,9 @@ wss.on('connection', (ws) => {
 function checkEnd(room) {
   if (room.status !== 'playing') return;
   const alivePlayers = [...room.players.entries()].filter(([, p]) => p.alive);
-  if (room.players.size >= 2 && alivePlayers.length <= 1) {
+  const startCount = room.startCount || room.players.size;
+  // 살아있는 사람이 1명 이하이거나, 접속 자체가 1명만 남은 경우(나머지 전원 접속 끊김) 모두 종료 처리
+  if (startCount >= 2 && (alivePlayers.length <= 1 || room.players.size <= 1)) {
     room.status = 'ended';
     const ranking = [...room.players.entries()]
       .map(([id, p]) => ({ id, name: p.name, score: p.score, alive: p.alive }))
