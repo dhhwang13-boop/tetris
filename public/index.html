@@ -139,7 +139,7 @@
   .chat-panel{ flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; position:relative; }
   .chat-log{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
   .chat-line{ font-size:12.5px; line-height:1.5; color:var(--text); word-break:break-word; }
-  .chat-line b{ color:var(--cyan); font-weight:700; margin-right:3px; }
+  .chat-line b{ font-weight:700; margin-right:3px; }
   .chat-input-row{ display:flex; gap:4px; }
   .chat-input-row input[type=text]{
     flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text);
@@ -297,7 +297,25 @@
   .opp-col-grid{ display:flex; flex-direction:column; gap:8px; width:280px; }
   .opp-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   .opp-slot{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px; position:relative; }
-  .opp-slot.empty{ background:var(--bg2); border:1px dashed var(--line); opacity:.5; min-height:266px; display:flex; align-items:center; justify-content:center; }
+  .opp-slot.empty{ background:var(--bg2); border:1px dashed var(--line); opacity:.5; min-height:266px; display:flex; align-items:center; justify-content:center; position:relative; }
+  .bot-add-btn{
+    display:none; position:absolute; width:40px; height:40px; border-radius:50%; background:var(--panel);
+    border:1px solid var(--cyan); color:var(--cyan); font-size:20px; align-items:center; justify-content:center;
+    cursor:pointer; z-index:3;
+  }
+  .opp-slot.empty:hover .bot-add-btn{ display:flex; }
+  .territory-col{ display:flex; flex-direction:column; align-items:center; gap:10px; width:280px; }
+  .territory-timer{ font-size:28px; font-weight:900; color:var(--yellow); letter-spacing:1px; }
+  #territory-canvas{ border:1px solid var(--line); border-radius:6px; }
+  .territory-legend{ display:flex; flex-direction:column; gap:6px; width:100%; }
+  .territory-legend-row{ display:flex; align-items:center; gap:8px; font-size:12px; }
+  .territory-legend-dot{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+  .territory-legend-name{ flex:1; color:var(--text); }
+  .territory-legend-count{ font-weight:700; color:var(--yellow); }
+  .board-frame.flag-0{ box-shadow:0 0 0 3px #e24b4a; }
+  .board-frame.flag-1{ box-shadow:0 0 0 3px #ff9c47; }
+  .board-frame.flag-2{ box-shadow:0 0 0 3px #ffce45; }
+  .board-frame.flag-3{ box-shadow:0 0 0 3px #52ff9d; }
   .opp-empty-label{ color:var(--dim); font-size:12px; letter-spacing:1px; text-align:center; }
   .opp-slot .opp-name{ font-size:9px; font-weight:700; margin-bottom:4px; display:flex; justify-content:space-between; }
   .opp-slot .opp-score{ color:var(--dim); }
@@ -462,6 +480,7 @@
     <select id="mp-mode-select" class="mp-select">
       <option value="classic2">클래식 (2인)</option>
       <option value="classic5">클래식 (5인)</option>
+      <option value="territory">땅따먹기 (4인, 2인도 가능)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -577,7 +596,7 @@
             <div class="sub" id="mp-end-sub"></div>
             <div id="mp-rank-list" style="width:220px; margin-top:10px;"></div>
             <div class="overlay-btns">
-              <button class="ov-btn main" id="btn-mp-end-menu">메뉴로</button>
+              <button class="ov-btn main" id="btn-mp-end-menu">확인</button>
             </div>
           </div>
           <div class="attack-toast" id="attack-toast"></div>
@@ -612,6 +631,12 @@
 
       <div class="opp-col-grid" id="opp-col-grid" style="display:none;">
         <div class="opp-grid" id="opp-grid"></div>
+      </div>
+
+      <div class="territory-col" id="territory-col" style="display:none;">
+        <div class="territory-timer" id="territory-timer">03:00</div>
+        <canvas id="territory-canvas" width="280" height="280"></canvas>
+        <div class="territory-legend" id="territory-legend"></div>
       </div>
     </div>
   </div>
@@ -673,6 +698,11 @@ function coinsForMpResult(mode, rank, total){
   if(mode === 'classic2') return rank===1 ? 2 : 0;
   const table = { 2:{1:2,2:0}, 3:{1:3,2:1,3:0}, 4:{1:4,2:2,3:1,4:0}, 5:{1:5,2:3,3:2,4:0,5:0} };
   const t = table[total] || {};
+  return t[rank] || 0;
+}
+function coinsForTerritory(rank, humanCount){
+  const table = { 1:{1:1}, 2:{1:2}, 3:{1:3,2:1}, 4:{1:4,2:2} };
+  const t = table[humanCount] || {};
   return t[rank] || 0;
 }
 function coinsForSingleScore(score){
@@ -1076,7 +1106,7 @@ document.getElementById('btn-esc-settings').addEventListener('click', ()=>{
 // ---------- 멀티플레이 네트워킹 ----------
 let mpWS = null, mpPlayerId = null, mpRoomId = null, mpIsHost = false, mpIsPrivateRoom = false, mpMyPassword = '';
 let mpOtherIds = [], mpOthers = {};
-let mpRoomMode = 'classic5', mpMatchStarted = false, mpHostId = null;
+let mpRoomMode = 'classic5', mpMatchStarted = false, mpHostId = null, mpIsSpectator = false;
 let mpActive = false, mpStateTimer = null, mpRoomListTimer = null, mpPendingJoinRoomId = null;
 const PLAYER_COLORS = ['#3ddbff','#ff5ea8','#ffce45','#52ff9d','#a855f7'];
 const GARBAGE_TABLE = {1:0,2:1,3:2,4:4};
@@ -1141,16 +1171,23 @@ function mpHandleMessage(msg){
       }
       break;
     case 'lobby': mpRenderLobby(msg); break;
+    case 'spectating': mpEnterSpectatorMode(msg); break;
     case 'roomList': mpRenderRoomList(msg.rooms); break;
     case 'countdown': mpBeginCountdown(msg.startAt); break;
-    case 'gameStart': startMultiplayerGame(msg.players, msg.mode); break;
+    case 'gameStart': startMultiplayerGame(msg); break;
     case 'opponentState': mpApplyOpponentState(msg); break;
+    case 'territoryUpdate':
+      mpTerritoryCounts = msg.counts || {};
+      mpRenderTerritoryLand(msg.land);
+      mpRenderTerritoryLegend();
+      break;
+    case 'territoryEnd': mpEndTerritoryMatch(msg.ranking, msg.humanCount, msg.noCoinIds); break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
     case 'chat':
-      appendChatLine(msg.name, msg.text);
+      { const info = mpOthers[msg.id]; appendChatLine(msg.name, msg.text, info ? info.color : null); }
       if(msg.isEmoji) mpShowSpeechBubble(msg.id, msg.text);
       break;
-    case 'end': mpEndGame(msg.ranking, msg.mode, msg.noCoins); break;
+    case 'end': mpEndGame(msg.ranking, msg.mode, msg.noCoins, msg.noCoinIds); break;
   }
 }
 
@@ -1221,10 +1258,30 @@ function mpRenderRoomList(rooms){
   rooms.forEach(r=>{
     const row = document.createElement('div');
     row.className = 'mp-room-row';
-    row.innerHTML = `<span class="rn">${r.isPrivate ? '<span class="mp-lock-badge">🔒 비공개</span>' : '<span class="mp-lock-badge" style="background:rgba(82,255,157,.15); color:var(--good);">공개</span>'} ${mpEscapeHtml(r.title || (r.hostName + '의 방'))}</span><span class="rc">${r.count}/${r.max}</span>`;
-    row.addEventListener('dblclick', ()=>{ mpTryJoinRoom(r.roomId, r.isPrivate); });
+    const isPlaying = r.status === 'playing';
+    const statusBadge = isPlaying
+      ? '<span class="mp-lock-badge" style="background:rgba(255,206,69,.15); color:var(--yellow);">게임중</span>'
+      : (r.isPrivate ? '<span class="mp-lock-badge">🔒 비공개</span>' : '<span class="mp-lock-badge" style="background:rgba(82,255,157,.15); color:var(--good);">공개</span>');
+    row.innerHTML = `<span class="rn">${statusBadge} ${mpEscapeHtml(r.title || (r.hostName + '의 방'))}</span><span class="rc">${r.count}/${r.max}${isPlaying ? ' · 관전가능' : ''}</span>`;
+    row.addEventListener('dblclick', ()=>{
+      if(isPlaying) mpTrySpectateRoom(r.roomId, r.isPrivate);
+      else mpTryJoinRoom(r.roomId, r.isPrivate);
+    });
     listEl.appendChild(row);
   });
+}
+let mpPendingSpectate = false;
+function mpTrySpectateRoom(roomId, isPrivate){
+  if(isPrivate){
+    mpPendingJoinRoomId = roomId;
+    mpPendingSpectate = true;
+    document.getElementById('mp-pw-input').value = '';
+    document.getElementById('mp-pw-err').textContent = '';
+    document.getElementById('mp-pw-modal').style.display = 'flex';
+    document.getElementById('mp-pw-input').focus();
+  } else {
+    mpSend({type:'joinSpectator', roomId});
+  }
 }
 function mpTryJoinRoom(roomId, isPrivate){
   const name = getNickname();
@@ -1232,6 +1289,7 @@ function mpTryJoinRoom(roomId, isPrivate){
   if(!name){ err.textContent = '닉네임을 입력해주세요.'; return; }
   if(isPrivate){
     mpPendingJoinRoomId = roomId;
+    mpPendingSpectate = false;
     document.getElementById('mp-pw-input').value = '';
     document.getElementById('mp-pw-err').textContent = '';
     document.getElementById('mp-pw-modal').style.display = 'flex';
@@ -1245,6 +1303,11 @@ document.getElementById('mp-pw-confirm').addEventListener('click', ()=>{
   const name = getNickname();
   const password = document.getElementById('mp-pw-input').value.trim();
   if(!password){ document.getElementById('mp-pw-err').textContent = '코드를 입력해주세요.'; return; }
+  if(mpPendingSpectate){
+    mpSend({type:'joinSpectator', roomId: mpPendingJoinRoomId, password});
+    mpPendingSpectate = false;
+    return;
+  }
   mpIsPrivateRoom = true; mpMyPassword = password;
   mpSend({type:'joinRoom', roomId: mpPendingJoinRoomId, password, name});
 });
@@ -1259,17 +1322,14 @@ document.getElementById('btn-multi').addEventListener('click', ()=>{
 });
 document.getElementById('mp-login-back').addEventListener('click', ()=>{ mpDisconnect(); showScreen('screen-menu'); });
 
-function mpEnterWaitingRoom(){
-  mpActive = true; mpMatchStarted = false; gameOverHandled = false; mpMyReady = false;
-  showScreen('screen-game');
-  closeEscMenu();
+function mpShowWaitingVisuals(){
   document.getElementById('overlay-gameover').style.display = 'none';
   document.getElementById('overlay-mp-end').style.display = 'none';
   document.getElementById('overlay-mp-countdown').style.display = 'none';
-  document.getElementById('chat-log').innerHTML = '';
-  setLeftColLayout(true);
   document.getElementById('mp-wait-banner').style.display = 'flex';
   document.getElementById('mp-ready-box').style.display = 'flex';
+  document.getElementById('main-canvas').parentElement.classList.remove('flag-0','flag-1','flag-2','flag-3');
+  clearInterval(mpTerritoryTimerHandle);
   // 대기 중에는 블록을 놓을 수 없고 NEXT도 비워둠 (게임 시작 전 미리 만지지 못하게)
   eng = newEngine();
   mctx.fillStyle = '#05060c'; mctx.fillRect(0,0,COLS*CELL,ROWS*CELL);
@@ -1278,12 +1338,67 @@ function mpEnterWaitingRoom(){
   document.getElementById('stat-score').textContent = 0;
   document.getElementById('stat-lines').textContent = 0;
   document.getElementById('stat-level').textContent = 1;
+}
+function mpEnterWaitingRoom(){
+  mpIsSpectator = false;
+  mpActive = true; mpMatchStarted = false; gameOverHandled = false; mpMyReady = false;
+  showScreen('screen-game');
+  closeEscMenu();
+  document.getElementById('chat-log').innerHTML = '';
+  setLeftColLayout(true);
+  document.getElementById('hold-panel').style.display = 'block';
+  mpShowWaitingVisuals();
   document.removeEventListener('keydown', onKeyDown);
   document.removeEventListener('keyup', onKeyUp);
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
 }
+function mpEnterSpectatorMode(msg){
+  mpIsSpectator = true; mpActive = true; mpMatchStarted = (msg.status === 'playing'); mpRoomMode = msg.mode;
+  mpRoomId = msg.roomId; mpPlayerId = msg.playerId;
+  gameOverHandled = false;
+  showScreen('screen-game');
+  closeEscMenu();
+  document.getElementById('chat-log').innerHTML = '';
+  document.removeEventListener('keydown', onKeyDown);
+  document.removeEventListener('keyup', onKeyUp);
+  document.addEventListener('keydown', onKeyDown); // Esc 메뉴(나가기)는 계속 사용 가능
+  setLeftColLayout(true);
+  document.getElementById('hold-panel').style.display = 'none';
+  document.getElementById('overlay-gameover').style.display = 'none';
+  document.getElementById('overlay-mp-end').style.display = 'none';
+  document.getElementById('overlay-mp-countdown').style.display = 'none';
+  mctx.fillStyle = '#05060c'; mctx.fillRect(0,0,COLS*CELL,ROWS*CELL);
+  nctx.fillStyle = '#05060c'; nctx.fillRect(0,0,96,340);
+  hctx.fillStyle = '#05060c'; hctx.fillRect(0,0,96,72);
+  document.getElementById('stat-score').textContent = 0;
+  document.getElementById('stat-lines').textContent = 0;
+  document.getElementById('stat-level').textContent = 1;
+
+  document.getElementById('mp-wait-banner').style.display = 'flex';
+  document.getElementById('mp-wait-title').textContent = (msg.title || msg.roomId) + ' (관전 중)';
+  document.getElementById('mp-wait-count').textContent = msg.status === 'playing' ? '게임중' : `${msg.players.length}명`;
+  document.getElementById('mp-ready-box').style.display = 'none';
+
+  mpLayoutMode = 'grid';
+  document.getElementById('opp-col-single').style.display = 'none';
+  const gridCol = document.getElementById('opp-col-grid');
+  gridCol.style.display = 'flex';
+  const grid = document.getElementById('opp-grid');
+  grid.innerHTML = '';
+  mpOthers = {};
+  mpOtherIds = msg.players.map(p=>p.id);
+  msg.players.forEach((p,i)=>{
+    mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[i%PLAYER_COLORS.length], alive:p.alive, score:p.score };
+    const slot = document.createElement('div');
+    slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
+    slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}</span><span class="opp-score" id="opp-score-${p.id}">${p.score}</span></div>
+      <canvas id="opp-board-${p.id}" width="120" height="240"></canvas>`;
+    grid.appendChild(slot);
+  });
+}
 function mpBuildOppSlots(mode, players){
+  document.getElementById('territory-col').style.display = 'none';
   const others = players.filter(p=>p.id!==mpPlayerId);
   const singleCol = document.getElementById('opp-col-single');
   const gridCol = document.getElementById('opp-col-grid');
@@ -1292,6 +1407,9 @@ function mpBuildOppSlots(mode, players){
     singleCol.style.display = 'flex';
     gridCol.style.display = 'none';
     singleCol.classList.remove('dead');
+    const singleCanvas = document.getElementById('opp-single-canvas');
+    const sctx = singleCanvas.getContext('2d');
+    sctx.fillStyle = '#05060c'; sctx.fillRect(0,0,singleCanvas.width,singleCanvas.height);
     const bubble = singleCol.querySelector('.opp-speech-bubble'); if(bubble) bubble.remove();
     const check = document.getElementById('opp-single-name-wrap').querySelector('.ready-check-bubble'); if(check) check.remove();
     const opp = others[0];
@@ -1316,11 +1434,15 @@ function mpBuildOppSlots(mode, players){
       if(p){
         slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
         if(!mpOthers[p.id]) mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[(i+1)%PLAYER_COLORS.length], alive:true, score:0 };
-        slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.id===mpHostId?' <span style="color:var(--yellow); font-size:9px;">(호스트)</span>':''}</span><span class="opp-score" id="opp-score-${p.id}">${mpOthers[p.id].score}</span></div>
+        slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.id===mpHostId?' <span style="color:var(--yellow); font-size:9px;">(호스트)</span>':''}</span><span class="opp-score" id="opp-score-${p.id}">${mpOthers[p.id].score||0}</span></div>
           <canvas id="opp-board-${p.id}" width="120" height="240"></canvas>`;
       } else {
         slot.className = 'opp-slot empty';
-        slot.innerHTML = `<div class="opp-empty-label">입장대기중</div>`;
+        const showBotBtn = (mode === 'territory' && mpIsHost && !mpIsSpectator);
+        slot.innerHTML = `<div class="opp-empty-label">입장대기중</div>${showBotBtn ? '<div class="bot-add-btn" title="봇 추가">+</div>' : ''}`;
+        if(showBotBtn){
+          slot.querySelector('.bot-add-btn').addEventListener('click', (e)=>{ e.stopPropagation(); mpSend({type:'addBot'}); });
+        }
       }
       grid.appendChild(slot);
     }
@@ -1328,6 +1450,19 @@ function mpBuildOppSlots(mode, players){
 }
 let mpMyReady = false;
 function mpRenderLobby(msg){
+  if(mpIsSpectator){
+    document.getElementById('mp-wait-title').textContent = (msg.title || msg.roomId) + ' (관전 중 · 참가 가능)';
+    document.getElementById('mp-wait-count').textContent = `${msg.players.length}/${msg.max}`;
+    mpBuildOppSlots(msg.mode || mpRoomMode, msg.players);
+    const readyBtn = document.getElementById('mp-waiting-ready-btn');
+    const startBtn = document.getElementById('mp-waiting-start-btn');
+    document.getElementById('mp-ready-box').style.display = 'flex';
+    startBtn.style.display = 'none';
+    readyBtn.style.display = 'block';
+    readyBtn.disabled = msg.players.length >= msg.max;
+    readyBtn.textContent = msg.players.length >= msg.max ? '방이 가득 찼어요' : '참가하기';
+    return;
+  }
   mpIsHost = (msg.hostId === mpPlayerId);
   mpHostId = msg.hostId;
   mpRoomMode = msg.mode || mpRoomMode;
@@ -1343,22 +1478,28 @@ function mpRenderLobby(msg){
   if(mpIsHost){
     readyBtn.style.display = 'none';
     startBtn.style.display = 'block';
+    startBtn.disabled = false;
     const allReady = msg.players.length>=2 && msg.players.every(p=>p.ready);
     startBtn.disabled = !allReady;
     startBtn.textContent = '게임 시작';
   } else {
     startBtn.style.display = 'none';
     readyBtn.style.display = 'block';
+    readyBtn.disabled = false;
     const me = msg.players.find(p=>p.id===mpPlayerId);
     mpMyReady = !!(me && me.ready);
     readyBtn.textContent = mpMyReady ? '취소' : '게임 준비';
   }
 }
 document.getElementById('mp-waiting-ready-btn').addEventListener('click', ()=>{
+  if(mpIsSpectator){ mpSend({type:'joinAsPlayer', name: getNickname()}); return; }
   mpSend({type:'ready', ready: !mpMyReady});
 });
 document.getElementById('mp-waiting-start-btn').addEventListener('click', ()=>{ mpSend({type:'start'}); });
-document.getElementById('btn-mp-end-menu').addEventListener('click', ()=>{ mpDisconnect(); hideOppPanels(); showScreen('screen-menu'); });
+document.getElementById('btn-mp-end-menu').addEventListener('click', ()=>{
+  mpMatchStarted = false;
+  mpShowWaitingVisuals();
+});
 
 function mpBeginCountdown(startAt){
   document.getElementById('mp-wait-banner').style.display = 'none';
@@ -1385,7 +1526,12 @@ function onLinesCleared(cleared, tspin, combo){
   if(combo>=2) showComboToast(combo);
   if(mpActive && cleared>0){
     const total = attackFor(cleared, tspin) + comboBonus(combo||0);
-    if(total>0) mpSend({type:'garbage', amount: total});
+    if(mpRoomMode === 'territory'){
+      const captureAmount = Math.min(total, 6); // 한 번에 너무 많은 땅을 먹지 않도록 상한
+      if(captureAmount>0) mpSend({type:'territoryCapture', amount: captureAmount});
+    } else if(total>0){
+      mpSend({type:'garbage', amount: total});
+    }
   }
 }
 let comboToastTimer = null;
@@ -1396,6 +1542,19 @@ function showComboToast(combo){
   el.classList.add('show');
   clearTimeout(comboToastTimer);
   comboToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 1100);
+}
+function addGarbage(e, amount){
+  if(amount<=0) return;
+  for(let i=0;i<amount;i++){
+    e.board.shift();
+    const gapCol = Math.floor(Math.random()*COLS);
+    const row = Array(COLS).fill('G');
+    row[gapCol] = 0;
+    e.board.push(row);
+  }
+  if(e.cur && collide(e, e.cur.m, e.cur.x, e.cur.y)){
+    e.gameOver = true;
+  }
 }
 function mpIncomingGarbage(amount, from){
   if(!mpActive || eng.gameOver) return;
@@ -1440,17 +1599,16 @@ function mpApplyOpponentState(msg){
     for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
   }
 }
-function mpEndGame(ranking, mode, noCoins){
-  mpActive = false; mpMatchStarted = false;
+function mpEndGame(ranking, mode, noCoins, noCoinIds){
+  mpMatchStarted = false;
   clearInterval(mpStateTimer);
   running = false;
   if(rafId) cancelAnimationFrame(rafId);
   if(eng) eng.gameOver = true;
-  document.removeEventListener('keydown', onKeyDown);
-  document.removeEventListener('keyup', onKeyUp);
   const myRank = ranking.findIndex(r=>r.id===mpPlayerId) + 1;
   const total = ranking.length;
-  const coinsWon = (!noCoins && myRank>0) ? coinsForMpResult(mode || mpRoomMode, myRank, total) : 0;
+  const isDupBlocked = Array.isArray(noCoinIds) && noCoinIds.includes(mpPlayerId);
+  const coinsWon = (!noCoins && !isDupBlocked && myRank>0) ? coinsForMpResult(mode || mpRoomMode, myRank, total) : 0;
   if(coinsWon>0) addCoins(coinsWon);
   const iWon = ranking.length>0 && ranking[0].id===mpPlayerId && ranking[0].alive;
   reportMpResult(iWon);
@@ -1461,9 +1619,31 @@ function mpEndGame(ranking, mode, noCoins){
   listEl.innerHTML = ranking.map((r,i)=>`<div class="rank-row"><span><span class="place">${i+1}위</span>${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''}</span><span>${r.score}점</span></div>`).join('');
   document.getElementById('overlay-mp-end').style.display = 'flex';
 }
+function mpEndTerritoryMatch(ranking, humanCount, noCoinIds){
+  mpMatchStarted = false;
+  clearInterval(mpStateTimer);
+  clearInterval(mpTerritoryTimerHandle);
+  running = false;
+  if(rafId) cancelAnimationFrame(rafId);
+  if(eng) eng.gameOver = true;
+  const myRank = ranking.findIndex(r=>r.id===mpPlayerId) + 1;
+  const isDupBlocked = Array.isArray(noCoinIds) && noCoinIds.includes(mpPlayerId);
+  const coinsWon = (!isDupBlocked && myRank>0) ? coinsForTerritory(myRank, humanCount) : 0;
+  if(coinsWon>0) addCoins(coinsWon);
+  const iWon = myRank === 1;
+  reportMpResult(iWon);
+  document.getElementById('mp-end-title').textContent = iWon ? '🏆 최대 영토를 차지했어요!' : '게임 종료';
+  document.getElementById('mp-end-sub').innerHTML = `시간 종료! 땅이 가장 넓은 사람이 승리해요.` +
+    (coinsWon>0 ? `<br><span style="color:var(--yellow); font-weight:700;">🪙 +${coinsWon} 코인 획득!</span>` : '');
+  const listEl = document.getElementById('mp-rank-list');
+  listEl.innerHTML = ranking.map((r,i)=>`<div class="rank-row"><span><span class="place">${i+1}위</span>${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''}${r.isBot?' 🤖':''}</span><span>${r.land}칸</span></div>`).join('');
+  document.getElementById('overlay-mp-end').style.display = 'flex';
+}
 
 let mpLayoutMode = 'single'; // 'single'(2인) | 'grid'(3~5인)
-function startMultiplayerGame(playerList, mode){
+let mpTerritoryOrder = [], mpTerritoryTimerHandle = null, mpMyFlagIndex = -1;
+function startMultiplayerGame(msg){
+  const playerList = msg.players, mode = msg.mode;
   mpRoomMode = mode || mpRoomMode;
   document.getElementById('mp-wait-banner').style.display = 'none';
   document.getElementById('mp-ready-box').style.display = 'none';
@@ -1479,7 +1659,30 @@ function startMultiplayerGame(playerList, mode){
   gravityAcc = 0; lastTime = 0;
 
   mpOthers = {};
-  mpBuildOppSlots(mpRoomMode, playerList);
+  document.getElementById('main-canvas').parentElement.classList.remove('flag-0','flag-1','flag-2','flag-3');
+  document.getElementById('opp-col-single').style.display = 'none';
+  document.getElementById('opp-col-grid').style.display = 'none';
+  document.getElementById('territory-col').style.display = 'none';
+  clearInterval(mpTerritoryTimerHandle);
+
+  if(mpRoomMode === 'territory'){
+    mpTerritoryOrder = msg.territoryOrder || [];
+    mpMyFlagIndex = mpTerritoryOrder.indexOf(mpPlayerId);
+    if(mpMyFlagIndex >= 0) document.getElementById('main-canvas').parentElement.classList.add('flag-'+mpMyFlagIndex);
+    playerList.forEach((p,i)=>{ mpOthers[p.id] = { name:p.name, color: TERRITORY_FLAG_COLORS[mpTerritoryOrder.indexOf(p.id)] || '#888', isBot: !!p.isBot, score:0, alive:true }; });
+    document.getElementById('territory-col').style.display = 'flex';
+    mpRenderTerritoryLand(msg.land);
+    mpTerritoryCounts = {};
+    if(mpTerritoryLand){
+      mpTerritoryLand.forEach(row=>row.forEach(cell=>{
+        if(cell !== '.'){ const id = mpTerritoryOrder[parseInt(cell,10)]; if(id) mpTerritoryCounts[id] = (mpTerritoryCounts[id]||0)+1; }
+      }));
+    }
+    mpRenderTerritoryLegend();
+    mpStartTerritoryTimer(msg.territoryEndAt);
+  } else {
+    mpBuildOppSlots(mpRoomMode, playerList);
+  }
 
   renderAll();
   document.removeEventListener('keydown', onKeyDown);
@@ -1494,10 +1697,57 @@ function startMultiplayerGame(playerList, mode){
   mpSendState();
   updateGameBgmForScreen('screen-game');
 }
+const TERRITORY_FLAG_COLORS = ['#e24b4a', '#ff9c47', '#ffce45', '#52ff9d'];
+let mpTerritoryLand = null, mpTerritoryCounts = {};
+function mpRenderTerritoryLand(flat){
+  if(!flat) return;
+  mpTerritoryLand = flat.split('|').map(row=>row.split(''));
+  const canvas = document.getElementById('territory-canvas');
+  const ctx = canvas.getContext('2d');
+  const size = mpTerritoryLand.length;
+  const cell = canvas.width / size;
+  ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<size;r++) for(let c=0;c<size;c++){
+    const v = mpTerritoryLand[r][c];
+    if(v === '.') continue;
+    const idx = parseInt(v,10);
+    ctx.fillStyle = TERRITORY_FLAG_COLORS[idx] || '#888';
+    ctx.fillRect(c*cell, r*cell, Math.ceil(cell), Math.ceil(cell));
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  for(let i=0;i<=size;i++){
+    ctx.beginPath(); ctx.moveTo(i*cell,0); ctx.lineTo(i*cell,canvas.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*cell); ctx.lineTo(canvas.width,i*cell); ctx.stroke();
+  }
+}
+function mpRenderTerritoryLegend(){
+  const el = document.getElementById('territory-legend');
+  el.innerHTML = mpTerritoryOrder.map((id,i)=>{
+    const info = mpOthers[id] || { name: (id===mpPlayerId?'나':'-') };
+    const name = id===mpPlayerId ? (info.name||'나')+' (나)' : (info.name||'-');
+    const count = mpTerritoryCounts[id] || 0;
+    return `<div class="territory-legend-row"><span class="territory-legend-dot" style="background:${TERRITORY_FLAG_COLORS[i]}"></span><span class="territory-legend-name">${mpEscapeHtml(name)}</span><span class="territory-legend-count">${count}</span></div>`;
+  }).join('');
+}
+function mpStartTerritoryTimer(endAt){
+  clearInterval(mpTerritoryTimerHandle);
+  const el = document.getElementById('territory-timer');
+  function tick(){
+    const remain = Math.max(0, Math.ceil((endAt - Date.now())/1000));
+    const m = Math.floor(remain/60), s = remain%60;
+    el.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    if(remain<=0) clearInterval(mpTerritoryTimerHandle);
+  }
+  tick();
+  mpTerritoryTimerHandle = setInterval(tick, 500);
+}
 
 function hideOppPanels(){
   document.getElementById('opp-col-single').style.display = 'none';
   document.getElementById('opp-col-grid').style.display = 'none';
+  document.getElementById('territory-col').style.display = 'none';
+  clearInterval(mpTerritoryTimerHandle);
+  document.getElementById('main-canvas').parentElement.classList.remove('flag-0','flag-1','flag-2','flag-3');
 }
 // ---- 좌측 패널 레이아웃 전환 (싱글: 좌측에 HOLD+STATS / 멀티: 좌측 HOLD+채팅, STATS는 NEXT 옆으로) ----
 function setLeftColLayout(isMulti){
@@ -1522,17 +1772,17 @@ function setLeftColLayout(isMulti){
 }
 
 // ---- 채팅 ----
-function appendChatLine(name, text){
+function appendChatLine(name, text, color){
   const log = document.getElementById('chat-log');
   const line = document.createElement('div');
   line.className = 'chat-line';
-  line.innerHTML = `<b>${mpEscapeHtml(name)}:</b>${mpEscapeHtml(text)}`;
+  line.innerHTML = `<b style="color:${color || 'var(--cyan)'}">${mpEscapeHtml(name)}:</b>${mpEscapeHtml(text)}`;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 }
 function mpSendChat(text, isEmoji){
   if(!text) return;
-  appendChatLine('나', text);
+  appendChatLine('나', text, 'var(--cyan)');
   mpSend({type:'chat', text, isEmoji: !!isEmoji});
 }
 function mpFindOppAnchor(id){
