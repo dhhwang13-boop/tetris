@@ -275,11 +275,10 @@ wss.on('connection', (ws, req) => {
     }
 
     if (msg.type === 'garbage') {
-      if (room.mode === 'territory') return;
       const aliveOthers = [...room.players.entries()].filter(([id, p]) => id !== ws.playerId && p.alive);
       if (aliveOthers.length === 0) return;
-      if (room.mode === 'classic5') {
-        // 5인 모드: 한 명이 공격하면 살아있는 나머지 전원이 동시에 공격받음
+      if (room.mode === 'classic5' || room.mode === 'territory') {
+        // 5인/땅따먹기 모드: 한 명이 공격하면 살아있는 나머지 전원이 동시에 공격받음
         for (const [, targetP] of aliveOthers) {
           send(targetP.ws, { type: 'garbage', amount: msg.amount, from: me.name });
         }
@@ -405,7 +404,7 @@ function endTerritoryMatch(room){
   broadcastAll(room, { type: 'territoryEnd', ranking, mode: room.mode, humanCount, noCoinIds });
   room.status = 'lobby';
   room.land = null;
-  for (const [id, p] of room.players) { p.ready = (id === room.hostId); p.score = 0; p.lines = 0; p.alive = true; }
+  for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; }
   broadcastAll(room, lobbyPayload(room));
 }
 function startBotSimulation(room){
@@ -443,7 +442,7 @@ function checkEnd(room) {
     broadcastAll(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null, mode: room.mode, noCoins, noCoinIds });
     // 종료 후 방을 나가지 않고 대기실로 복귀 (호스트만 자동 준비, 나머지는 재준비 필요)
     room.status = 'lobby';
-    for (const [id, p] of room.players) { p.ready = (id === room.hostId); p.score = 0; p.lines = 0; p.alive = true; }
+    for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; }
     broadcastAll(room, lobbyPayload(room));
   }
 }
