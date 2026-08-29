@@ -331,6 +331,13 @@
     transition:opacity .15s, transform .15s; z-index:5; white-space:nowrap;
   }
   .combo-toast.show{ opacity:1; transform:translateX(-50%) scale(1); }
+  .mp-result-toast{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.9); background:var(--panel);
+    border:1px solid var(--line); color:var(--text); padding:16px 28px; border-radius:12px; font-size:15px;
+    font-weight:700; text-align:center; line-height:1.6; opacity:0; transition:opacity .2s, transform .2s;
+    z-index:8; white-space:nowrap; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  .mp-result-toast.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
   .rank-row{ display:flex; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--line); font-size:12px; }
   .rank-row:last-child{ border-bottom:none; }
   .rank-row .place{ color:var(--yellow); font-weight:900; margin-right:6px; }
@@ -524,6 +531,13 @@
   </div>
 </div>
 
+<div class="mp-modal" id="mp-notice-modal" style="display:none;">
+  <div class="mp-modal-card" style="width:320px; text-align:center;">
+    <div class="mp-title" id="mp-notice-text" style="margin-bottom:16px;">-</div>
+    <button class="ov-btn main" id="mp-notice-ok" style="width:100%;">확인</button>
+  </div>
+</div>
+
 <!-- ================= 멀티플레이 로비 ================= -->
 <div class="screen" id="screen-mp-lobby">
   <div class="mp-card">
@@ -601,6 +615,7 @@
           </div>
           <div class="attack-toast" id="attack-toast"></div>
           <div class="combo-toast" id="combo-toast"></div>
+          <div class="mp-result-toast" id="mp-result-toast"></div>
         </div>
         <div class="controls-help" id="controls-help">
           <b>←/→</b> 이동 &nbsp; <b>↓</b> 소프트드롭 &nbsp; <b>↑</b> 회전 &nbsp; <b>Z</b> 반대회전<br>
@@ -1138,7 +1153,11 @@ function mpConnect(serverUrl, onOpen, onFail){
 }
 function mpSend(obj){ if(mpWS && mpWS.readyState===1) mpWS.send(JSON.stringify(obj)); }
 function mpDisconnect(){
-  if(mpWS){ try{ mpWS.close(); }catch(e){} mpWS = null; }
+  if(mpWS){
+    try{ if(mpWS.readyState===1) mpWS.send(JSON.stringify({type:'leaveRoom'})); }catch(e){}
+    try{ mpWS.close(); }catch(e){}
+    mpWS = null;
+  }
   mpConnectedUrl = null;
   mpActive = false;
   clearInterval(mpStateTimer);
@@ -1182,6 +1201,7 @@ function mpHandleMessage(msg){
       mpRenderTerritoryLegend();
       break;
     case 'territoryEnd': mpEndTerritoryMatch(msg.ranking, msg.humanCount, msg.noCoinIds); break;
+    case 'roomClosed': mpHandleRoomClosed(msg.reason); break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
     case 'chat':
       { const info = mpOthers[msg.id]; appendChatLine(msg.name, msg.text, info ? info.color : null); }
@@ -1502,9 +1522,9 @@ document.getElementById('btn-mp-end-menu').addEventListener('click', ()=>{
 });
 
 function mpBeginCountdown(startAt){
-  document.getElementById('mp-wait-banner').style.display = 'none';
-  document.getElementById('mp-ready-box').style.display = 'none';
   document.getElementById('overlay-mp-countdown').style.display = 'flex';
+  document.getElementById('mp-waiting-start-btn').disabled = true;
+  document.getElementById('mp-waiting-ready-btn').disabled = true;
   const numEl = document.getElementById('mp-countdown-num');
   const t = setInterval(()=>{
     const remain = Math.ceil((startAt - Date.now())/1000);
@@ -1599,6 +1619,13 @@ function mpApplyOpponentState(msg){
     for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
   }
 }
+function showMpResultToast(html){
+  const t = document.getElementById('mp-result-toast');
+  t.innerHTML = html;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>{ t.classList.remove('show'); }, 4000);
+}
 function mpEndGame(ranking, mode, noCoins, noCoinIds){
   mpMatchStarted = false;
   clearInterval(mpStateTimer);
@@ -1612,12 +1639,13 @@ function mpEndGame(ranking, mode, noCoins, noCoinIds){
   if(coinsWon>0) addCoins(coinsWon);
   const iWon = ranking.length>0 && ranking[0].id===mpPlayerId && ranking[0].alive;
   reportMpResult(iWon);
-  document.getElementById('mp-end-title').textContent = iWon ? '🏆 승리했습니다!' : '게임 종료';
-  document.getElementById('mp-end-sub').innerHTML = (iWon ? '마지막까지 살아남았어요.' : '다음엔 더 잘할 수 있어요.') +
-    (coinsWon>0 ? `<br><span style="color:var(--yellow); font-weight:700;">🪙 +${coinsWon} 코인 획득!</span>` : (noCoins ? `<br><span style="color:var(--dim); font-size:11px;">1분 이내 종료된 게임은 코인이 지급되지 않아요.</span>` : ''));
-  const listEl = document.getElementById('mp-rank-list');
-  listEl.innerHTML = ranking.map((r,i)=>`<div class="rank-row"><span><span class="place">${i+1}위</span>${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''}</span><span>${r.score}점</span></div>`).join('');
-  document.getElementById('overlay-mp-end').style.display = 'flex';
+  const rankLines = ranking.map((r,i)=>`${i+1}위 ${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''} - ${r.score}점`).join('<br>');
+  showMpResultToast(
+    `<div style="font-size:17px; margin-bottom:8px;">${iWon ? '🏆 승리했습니다!' : '게임 종료'}</div>` +
+    `<div style="font-size:12px; color:var(--dim); font-weight:400;">${rankLines}</div>` +
+    (coinsWon>0 ? `<div style="color:var(--yellow); margin-top:6px;">🪙 +${coinsWon} 코인 획득!</div>` : (noCoins ? `<div style="color:var(--dim); font-size:11px; font-weight:400; margin-top:6px;">1분 이내 종료된 게임은 코인이 지급되지 않아요.</div>` : ''))
+  );
+  mpShowWaitingVisuals();
 }
 function mpEndTerritoryMatch(ranking, humanCount, noCoinIds){
   mpMatchStarted = false;
@@ -1632,12 +1660,13 @@ function mpEndTerritoryMatch(ranking, humanCount, noCoinIds){
   if(coinsWon>0) addCoins(coinsWon);
   const iWon = myRank === 1;
   reportMpResult(iWon);
-  document.getElementById('mp-end-title').textContent = iWon ? '🏆 최대 영토를 차지했어요!' : '게임 종료';
-  document.getElementById('mp-end-sub').innerHTML = `시간 종료! 땅이 가장 넓은 사람이 승리해요.` +
-    (coinsWon>0 ? `<br><span style="color:var(--yellow); font-weight:700;">🪙 +${coinsWon} 코인 획득!</span>` : '');
-  const listEl = document.getElementById('mp-rank-list');
-  listEl.innerHTML = ranking.map((r,i)=>`<div class="rank-row"><span><span class="place">${i+1}위</span>${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''}${r.isBot?' 🤖':''}</span><span>${r.land}칸</span></div>`).join('');
-  document.getElementById('overlay-mp-end').style.display = 'flex';
+  const rankLines = ranking.map((r,i)=>`${i+1}위 ${mpEscapeHtml(r.name)}${r.id===mpPlayerId?' (나)':''}${r.isBot?' 🤖':''} - ${r.land}칸`).join('<br>');
+  showMpResultToast(
+    `<div style="font-size:17px; margin-bottom:8px;">${iWon ? '🏆 최대 영토를 차지했어요!' : '게임 종료'}</div>` +
+    `<div style="font-size:12px; color:var(--dim); font-weight:400;">${rankLines}</div>` +
+    (coinsWon>0 ? `<div style="color:var(--yellow); margin-top:6px;">🪙 +${coinsWon} 코인 획득!</div>` : '')
+  );
+  mpShowWaitingVisuals();
 }
 
 let mpLayoutMode = 'single'; // 'single'(2인) | 'grid'(3~5인)
@@ -1645,8 +1674,6 @@ let mpTerritoryOrder = [], mpTerritoryTimerHandle = null, mpMyFlagIndex = -1;
 function startMultiplayerGame(msg){
   const playerList = msg.players, mode = msg.mode;
   mpRoomMode = mode || mpRoomMode;
-  document.getElementById('mp-wait-banner').style.display = 'none';
-  document.getElementById('mp-ready-box').style.display = 'none';
   document.getElementById('overlay-mp-countdown').style.display = 'none';
   document.getElementById('overlay-gameover').style.display = 'none';
   document.getElementById('overlay-mp-end').style.display = 'none';
@@ -1683,6 +1710,8 @@ function startMultiplayerGame(msg){
   } else {
     mpBuildOppSlots(mpRoomMode, playerList);
   }
+  document.getElementById('mp-waiting-start-btn').disabled = true;
+  document.getElementById('mp-waiting-ready-btn').disabled = true;
 
   renderAll();
   document.removeEventListener('keydown', onKeyDown);
@@ -1742,6 +1771,24 @@ function mpStartTerritoryTimer(endAt){
   mpTerritoryTimerHandle = setInterval(tick, 500);
 }
 
+function mpShowNotice(text, onOk){
+  document.getElementById('mp-notice-text').textContent = text;
+  document.getElementById('mp-notice-modal').style.display = 'flex';
+  const btn = document.getElementById('mp-notice-ok');
+  const handler = ()=>{
+    document.getElementById('mp-notice-modal').style.display = 'none';
+    btn.removeEventListener('click', handler);
+    if(onOk) onOk();
+  };
+  btn.addEventListener('click', handler);
+}
+function mpHandleRoomClosed(reason){
+  const text = reason === 'closed' ? '호스트가 방을 닫았습니다.' : '호스트의 연결이 끊겼습니다.';
+  mpWS = null; mpConnectedUrl = null; mpActive = false;
+  clearInterval(mpStateTimer); clearInterval(mpRoomListTimer);
+  hideOppPanels();
+  mpShowNotice(text, ()=>{ showScreen('screen-menu'); });
+}
 function hideOppPanels(){
   document.getElementById('opp-col-single').style.display = 'none';
   document.getElementById('opp-col-grid').style.display = 'none';
