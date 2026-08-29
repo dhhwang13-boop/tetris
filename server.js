@@ -51,6 +51,14 @@ function broadcast(room, obj, exceptId) {
     if (pid !== exceptId) send(p.ws, obj);
   }
 }
+function broadcastToSpectators(room, obj) {
+  if (!room.spectators) return;
+  for (const [, s] of room.spectators) send(s.ws, obj);
+}
+function broadcastAll(room, obj, exceptId) {
+  broadcast(room, obj, exceptId);
+  broadcastToSpectators(room, obj);
+}
 function lobbyPayload(room) {
   return {
     type: 'lobby',
@@ -60,19 +68,23 @@ function lobbyPayload(room) {
     max: modeMax(room.mode),
     hostId: room.hostId,
     isPrivate: room.isPrivate,
-    players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready }))
+    players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready, isBot: !!p.isBot }))
   };
 }
-function modeMax(mode){ return mode === 'classic2' ? 2 : 5; }
+function modeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; return 5; }
+const TERRITORY_SIZE = 14;
+const FLAG_COLORS = ['#e24b4a', '#ff9c47', '#ffce45', '#52ff9d']; // 빨강/주황/노랑/초록
+const TERRITORY_CORNERS = [[0,0], [TERRITORY_SIZE-1,0], [0,TERRITORY_SIZE-1], [TERRITORY_SIZE-1,TERRITORY_SIZE-1]];
 const DEFAULT_ROOM_TITLES = ['즐거운 게임해요!', '테트리스 초보만!', '매너게임 부탁합니다!', 'glhf'];
 
 function roomListPayload() {
   const list = [...rooms.values()]
-    .filter(r => r.status === 'lobby' && r.players.size < modeMax(r.mode))
+    .filter(r => (r.status === 'lobby' && r.players.size < modeMax(r.mode)) || (r.status === 'playing' && r.mode === 'classic5'))
     .map(r => ({
       roomId: r.id,
       title: r.title || null,
       mode: r.mode,
+      status: r.status,
       hostName: (r.players.get(r.hostId) || {}).name || '플레이어',
       count: r.players.size,
       max: modeMax(r.mode),
@@ -81,12 +93,13 @@ function roomListPayload() {
   return { type: 'roomList', rooms: list };
 }
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   ws.playerId = null;
   ws.roomId = null;
   ws.isAlive = true;
   ws.msgCount = 0;
   ws.msgWindowStart = Date.now();
+  ws.ip = ((req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || (req.socket ? req.socket.remoteAddress : null);
   ws.on('pong', () => { ws.isAlive = true; });
 
   ws.on('message', (raw) => {
@@ -100,6 +113,51 @@ wss.on('connection', (ws) => {
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
 
+    if (msg.type === 'joinSpectator') {
+      const id = String(msg.roomId || '').toUpperCase();
+      const room = rooms.get(id);
+      if (!room) { send(ws, { type: 'error', message: '해당 방을 찾을 수 없어요.' }); return; }
+      if (room.mode !== 'classic5') { send(ws, { type: 'error', message: '이 모드는 관전을 지원하지 않아요.' }); return; }
+      if (room.isPrivate && String(msg.password || '') !== room.password) {
+        send(ws, { type: 'error', message: '코드가 올바르지 않아요.' });
+        return;
+      }
+      const specId = 'spec_' + uid();
+      ws.playerId = specId; ws.roomId = id; ws.isSpectator = true;
+      room.spectators.set(specId, { ws });
+      send(ws, {
+        type: 'spectating', roomId: id, playerId: specId, mode: room.mode, title: room.title, status: room.status,
+        players: [...room.players.entries()].map(([pid, p]) => ({ id: pid, name: p.name, score: p.score, alive: p.alive }))
+      });
+      return;
+    }
+
+    if (msg.type === 'joinAsPlayer') {
+      const room = rooms.get(ws.roomId);
+      if (!room || !ws.isSpectator) return;
+      if (room.status !== 'lobby') { send(ws, { type: 'error', message: '게임이 진행 중이라 지금은 참가할 수 없어요. 종료 후 참가해주세요.' }); return; }
+      if (room.players.size >= modeMax(room.mode)) { send(ws, { type: 'error', message: '방이 가득 찼어요.' }); return; }
+      room.spectators.delete(ws.playerId);
+      const newId = uid();
+      ws.playerId = newId; ws.isSpectator = false;
+      room.players.set(newId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: false, alive: true, score: 0, lines: 0, ip: ws.ip });
+      send(ws, { type: 'joined', roomId: room.id, playerId: newId });
+      broadcast(room, lobbyPayload(room));
+      return;
+    }
+
+    if (msg.type === 'addBot') {
+      const room = rooms.get(ws.roomId);
+      if (!room || ws.playerId !== room.hostId) return;
+      if (room.status !== 'lobby') return;
+      if (room.players.size >= modeMax(room.mode)) return;
+      const botId = 'bot_' + uid();
+      const botNum = [...room.players.values()].filter(p => p.isBot).length + 1;
+      room.players.set(botId, { ws: null, name: '봇 ' + botNum, ready: true, alive: true, score: 0, lines: 0, isBot: true });
+      broadcast(room, lobbyPayload(room));
+      return;
+    }
+
     if (msg.type === 'listRooms') {
       send(ws, roomListPayload());
       return;
@@ -112,9 +170,9 @@ wss.on('connection', (ws) => {
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
       const title = String(msg.roomTitle || '').trim().slice(0, 20) || DEFAULT_ROOM_TITLES[Math.floor(Math.random() * DEFAULT_ROOM_TITLES.length)];
-      const mode = msg.mode === 'classic2' ? 'classic2' : 'classic5';
-      const room = { id, title, mode, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
-      room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0 });
+      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : 'classic5');
+      const room = { id, title, mode, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map(), spectators: new Map() };
+      room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0, ip: ws.ip });
       rooms.set(id, room);
       ws.playerId = hostId; ws.roomId = id;
       send(ws, { type: 'created', roomId: id, playerId: hostId });
@@ -133,7 +191,7 @@ wss.on('connection', (ws) => {
         return;
       }
       const id2 = uid();
-      room.players.set(id2, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: false, alive: true, score: 0, lines: 0 });
+      room.players.set(id2, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: false, alive: true, score: 0, lines: 0, ip: ws.ip });
       ws.playerId = id2; ws.roomId = id;
       send(ws, { type: 'joined', roomId: id, playerId: id2 });
       broadcast(room, lobbyPayload(room));
@@ -157,16 +215,32 @@ wss.on('connection', (ws) => {
       if (![...room.players.values()].every(p => p.ready)) return;
       room.status = 'starting';
       room.startAt = Date.now() + 3000;
-      broadcast(room, { type: 'countdown', startAt: room.startAt });
+      broadcastAll(room, { type: 'countdown', startAt: room.startAt });
       setTimeout(() => {
         if (room.status !== 'starting') return;
         room.status = 'playing';
         room.startCount = room.players.size;
         room.playStartedAt = Date.now();
         for (const p of room.players.values()) { p.alive = true; p.score = 0; p.lines = 0; }
-        const playerList = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name }));
-        broadcast(room, { type: 'gameStart', players: playerList, mode: room.mode });
+        const playerList = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, isBot: !!p.isBot }));
+        if (room.mode === 'territory') {
+          initTerritoryMap(room);
+          room.territoryEndAt = Date.now() + 180000;
+          broadcastAll(room, { type: 'gameStart', players: playerList, mode: room.mode, territoryEndAt: room.territoryEndAt, land: territoryFlat(room), territoryOrder: room.territoryOrder });
+          startBotSimulation(room);
+          clearTimeout(room.territoryTimer);
+          room.territoryTimer = setTimeout(() => endTerritoryMatch(room), 180000);
+        } else {
+          broadcastAll(room, { type: 'gameStart', players: playerList, mode: room.mode });
+        }
       }, 3000);
+      return;
+    }
+
+    if (msg.type === 'territoryCapture') {
+      if (room.mode !== 'territory' || room.status !== 'playing') return;
+      const amount = Math.max(0, Math.min(6, msg.amount || 0));
+      if (amount > 0) { captureCells(room, ws.playerId, amount); broadcastTerritoryUpdate(room); }
       return;
     }
 
@@ -183,15 +257,31 @@ wss.on('connection', (ws) => {
         alive: me.alive,
         boardFlat: msg.boardFlat
       }, ws.playerId);
-      if (wasAlive && !me.alive) checkEnd(room);
+      broadcastToSpectators(room, {
+        type: 'opponentState',
+        id: ws.playerId,
+        score: me.score,
+        lines: me.lines,
+        alive: me.alive,
+        boardFlat: msg.boardFlat
+      });
+      if (wasAlive && !me.alive && room.mode !== 'territory') checkEnd(room);
       return;
     }
 
     if (msg.type === 'garbage') {
+      if (room.mode === 'territory') return;
       const aliveOthers = [...room.players.entries()].filter(([id, p]) => id !== ws.playerId && p.alive);
       if (aliveOthers.length === 0) return;
-      const [targetId, targetP] = aliveOthers[Math.floor(Math.random() * aliveOthers.length)];
-      send(targetP.ws, { type: 'garbage', amount: msg.amount, from: me.name });
+      if (room.mode === 'classic5') {
+        // 5인 모드: 한 명이 공격하면 살아있는 나머지 전원이 동시에 공격받음
+        for (const [, targetP] of aliveOthers) {
+          send(targetP.ws, { type: 'garbage', amount: msg.amount, from: me.name });
+        }
+      } else {
+        const [, targetP] = aliveOthers[Math.floor(Math.random() * aliveOthers.length)];
+        send(targetP.ws, { type: 'garbage', amount: msg.amount, from: me.name });
+      }
       return;
     }
 
@@ -205,33 +295,144 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     const room = rooms.get(ws.roomId);
-    if (!room || !ws.playerId) return;
+    if (!room) return;
+    if (ws.isSpectator) {
+      room.spectators.delete(ws.playerId);
+      return;
+    }
+    if (!ws.playerId) return;
     room.players.delete(ws.playerId);
-    if (room.players.size === 0) { rooms.delete(ws.roomId); return; }
+    if (room.players.size === 0 && room.spectators.size === 0) {
+      clearInterval(room.botInterval); clearTimeout(room.territoryTimer);
+      rooms.delete(ws.roomId); return;
+    }
+    if (room.players.size === 0) return; // 관전자만 남은 경우 방은 유지하되 더 진행할 참가자가 없음
     if (room.hostId === ws.playerId) {
       room.hostId = room.players.keys().next().value;
     }
     if (room.status === 'lobby') {
       broadcast(room, lobbyPayload(room));
     } else if (room.status === 'playing') {
-      checkEnd(room);
+      if (room.mode === 'territory') {
+        const humansLeft = [...room.players.values()].filter(p => !p.isBot).length;
+        if (humansLeft === 0) { clearInterval(room.botInterval); clearTimeout(room.territoryTimer); room.status = 'ended'; rooms.delete(ws.roomId); }
+      } else {
+        checkEnd(room);
+      }
     }
   });
 });
 
+function initTerritoryMap(room){
+  room.land = Array.from({ length: TERRITORY_SIZE }, () => Array(TERRITORY_SIZE).fill(null));
+  room.territoryOrder = [...room.players.keys()];
+  room.territoryOrder.forEach((id, i) => {
+    if (i < TERRITORY_CORNERS.length) {
+      const [r, c] = TERRITORY_CORNERS[i];
+      room.land[r][c] = id;
+    }
+  });
+}
+function captureCells(room, playerId, count){
+  if (!room.land) return;
+  for (let i = 0; i < count; i++) {
+    const candidates = [];
+    for (let r = 0; r < TERRITORY_SIZE; r++) for (let c = 0; c < TERRITORY_SIZE; c++) {
+      if (room.land[r][c] !== playerId) continue;
+      const neighbors = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+      for (const [nr, nc] of neighbors) {
+        if (nr<0||nr>=TERRITORY_SIZE||nc<0||nc>=TERRITORY_SIZE) continue;
+        if (room.land[nr][nc] === null) candidates.push([nr,nc]);
+      }
+    }
+    if (candidates.length > 0) {
+      const [cr, cc] = candidates[Math.floor(Math.random() * candidates.length)];
+      room.land[cr][cc] = playerId;
+      continue;
+    }
+    // 빈 땅이 지도 전체에 하나도 없을 때만 인접한 상대방 땅을 빼앗음
+    const anyNeutralLeft = room.land.some(row => row.some(cell => cell === null));
+    if (!anyNeutralLeft) {
+      const stealCandidates = [];
+      for (let r = 0; r < TERRITORY_SIZE; r++) for (let c = 0; c < TERRITORY_SIZE; c++) {
+        if (room.land[r][c] !== playerId) continue;
+        const neighbors = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+        for (const [nr, nc] of neighbors) {
+          if (nr<0||nr>=TERRITORY_SIZE||nc<0||nc>=TERRITORY_SIZE) continue;
+          if (room.land[nr][nc] !== null && room.land[nr][nc] !== playerId) stealCandidates.push([nr,nc]);
+        }
+      }
+      if (stealCandidates.length > 0) {
+        const [sr, sc] = stealCandidates[Math.floor(Math.random() * stealCandidates.length)];
+        room.land[sr][sc] = playerId;
+      }
+    }
+  }
+}
+function territoryFlat(room){
+  const idIndex = new Map(room.territoryOrder.map((id, i) => [id, i]));
+  return room.land.map(row => row.map(cell => cell === null ? '.' : String(idIndex.get(cell) ?? '.')).join('')).join('|');
+}
+function broadcastTerritoryUpdate(room){
+  const counts = {};
+  for (const row of room.land) for (const cell of row) { if (cell) counts[cell] = (counts[cell] || 0) + 1; }
+  broadcastAll(room, { type: 'territoryUpdate', land: territoryFlat(room), counts });
+}
+function endTerritoryMatch(room){
+  if (room.status !== 'playing') return;
+  clearInterval(room.botInterval);
+  room.status = 'ended';
+  const counts = {};
+  for (const row of room.land) for (const cell of row) { if (cell) counts[cell] = (counts[cell] || 0) + 1; }
+  const ranking = [...room.players.entries()]
+    .map(([id, p]) => ({ id, name: p.name, score: p.score, land: counts[id] || 0, isBot: !!p.isBot }))
+    .sort((a, b) => (b.land - a.land) || (b.score - a.score));
+  const humanCount = [...room.players.values()].filter(p => !p.isBot).length;
+  const ipCounts = {};
+  for (const [, p] of room.players) { if (p.ip) ipCounts[p.ip] = (ipCounts[p.ip] || 0) + 1; }
+  const noCoinIds = [...room.players.entries()].filter(([, p]) => p.ip && ipCounts[p.ip] >= 2).map(([id]) => id);
+  broadcastAll(room, { type: 'territoryEnd', ranking, mode: room.mode, humanCount, noCoinIds });
+  room.status = 'lobby';
+  room.land = null;
+  for (const [id, p] of room.players) { p.ready = (id === room.hostId); p.score = 0; p.lines = 0; p.alive = true; }
+  broadcastAll(room, lobbyPayload(room));
+}
+function startBotSimulation(room){
+  clearInterval(room.botInterval);
+  room.botInterval = setInterval(() => {
+    if (room.status !== 'playing') { clearInterval(room.botInterval); return; }
+    let changed = false;
+    for (const [id, p] of room.players) {
+      if (!p.isBot || !p.alive) continue;
+      if (Math.random() < 0.55) {
+        const cleared = 1 + Math.floor(Math.random() * 2);
+        p.score += cleared * 100;
+        if (room.mode === 'territory') { captureCells(room, id, cleared); changed = true; }
+      }
+    }
+    if (changed) broadcastTerritoryUpdate(room);
+  }, 3000);
+}
 function checkEnd(room) {
   if (room.status !== 'playing') return;
-  const alivePlayers = [...room.players.entries()].filter(([, p]) => p.alive);
   const startCount = room.startCount || room.players.size;
   // 살아있는 사람이 1명 이하이거나, 접속 자체가 1명만 남은 경우(나머지 전원 접속 끊김) 모두 종료 처리
   if (startCount >= 2 && (alivePlayers.length <= 1 || room.players.size <= 1)) {
     room.status = 'ended';
     const duration = Date.now() - (room.playStartedAt || Date.now());
     const noCoins = duration < 60000;
+    // 동일 IP로 2인 이상 참여(다중접속) 감지 시 해당 인원은 이번 판 코인 지급 대상에서 제외 (조용히 차단, 별도 안내 없음)
+    const ipCounts = {};
+    for (const [, p] of room.players) { if (p.ip) ipCounts[p.ip] = (ipCounts[p.ip] || 0) + 1; }
+    const noCoinIds = [...room.players.entries()].filter(([, p]) => p.ip && ipCounts[p.ip] >= 2).map(([id]) => id);
     const ranking = [...room.players.entries()]
       .map(([id, p]) => ({ id, name: p.name, score: p.score, alive: p.alive }))
       .sort((a, b) => (b.alive - a.alive) || (b.score - a.score));
-    broadcast(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null, mode: room.mode, noCoins });
+    broadcastAll(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null, mode: room.mode, noCoins, noCoinIds });
+    // 종료 후 방을 나가지 않고 대기실로 복귀 (호스트만 자동 준비, 나머지는 재준비 필요)
+    room.status = 'lobby';
+    for (const [id, p] of room.players) { p.ready = (id === room.hostId); p.score = 0; p.lines = 0; p.alive = true; }
+    broadcastAll(room, lobbyPayload(room));
   }
 }
 
