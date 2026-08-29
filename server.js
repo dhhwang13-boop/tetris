@@ -56,23 +56,26 @@ function lobbyPayload(room) {
     type: 'lobby',
     roomId: room.id,
     title: room.title,
+    mode: room.mode,
+    max: modeMax(room.mode),
     hostId: room.hostId,
     isPrivate: room.isPrivate,
     players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready }))
   };
 }
-const MAX_PLAYERS = 5;
+function modeMax(mode){ return mode === 'classic2' ? 2 : 5; }
 const DEFAULT_ROOM_TITLES = ['즐거운 게임해요!', '테트리스 초보만!', '매너게임 부탁합니다!', 'glhf'];
 
 function roomListPayload() {
   const list = [...rooms.values()]
-    .filter(r => r.status === 'lobby' && r.players.size < MAX_PLAYERS)
+    .filter(r => r.status === 'lobby' && r.players.size < modeMax(r.mode))
     .map(r => ({
       roomId: r.id,
       title: r.title || null,
+      mode: r.mode,
       hostName: (r.players.get(r.hostId) || {}).name || '플레이어',
       count: r.players.size,
-      max: MAX_PLAYERS,
+      max: modeMax(r.mode),
       isPrivate: r.isPrivate
     }));
   return { type: 'roomList', rooms: list };
@@ -109,7 +112,8 @@ wss.on('connection', (ws) => {
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
       const title = String(msg.roomTitle || '').trim().slice(0, 20) || DEFAULT_ROOM_TITLES[Math.floor(Math.random() * DEFAULT_ROOM_TITLES.length)];
-      const room = { id, title, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
+      const mode = msg.mode === 'classic2' ? 'classic2' : 'classic5';
+      const room = { id, title, mode, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map() };
       room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0 });
       rooms.set(id, room);
       ws.playerId = hostId; ws.roomId = id;
@@ -123,7 +127,7 @@ wss.on('connection', (ws) => {
       const room = rooms.get(id);
       if (!room) { send(ws, { type: 'error', message: '해당 방을 찾을 수 없어요. 목록을 새로고침해보세요.' }); return; }
       if (room.status !== 'lobby') { send(ws, { type: 'error', message: '이미 게임이 진행 중인 방이에요.' }); return; }
-      if (room.players.size >= MAX_PLAYERS) { send(ws, { type: 'error', message: '방이 가득 찼어요 (최대 5인).' }); return; }
+      if (room.players.size >= modeMax(room.mode)) { send(ws, { type: 'error', message: `방이 가득 찼어요 (최대 ${modeMax(room.mode)}인).` }); return; }
       if (room.isPrivate && String(msg.password || '') !== room.password) {
         send(ws, { type: 'error', message: '코드가 올바르지 않아요.' });
         return;
@@ -158,9 +162,10 @@ wss.on('connection', (ws) => {
         if (room.status !== 'starting') return;
         room.status = 'playing';
         room.startCount = room.players.size;
+        room.playStartedAt = Date.now();
         for (const p of room.players.values()) { p.alive = true; p.score = 0; p.lines = 0; }
         const playerList = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name }));
-        broadcast(room, { type: 'gameStart', players: playerList });
+        broadcast(room, { type: 'gameStart', players: playerList, mode: room.mode });
       }, 3000);
       return;
     }
@@ -221,10 +226,12 @@ function checkEnd(room) {
   // 살아있는 사람이 1명 이하이거나, 접속 자체가 1명만 남은 경우(나머지 전원 접속 끊김) 모두 종료 처리
   if (startCount >= 2 && (alivePlayers.length <= 1 || room.players.size <= 1)) {
     room.status = 'ended';
+    const duration = Date.now() - (room.playStartedAt || Date.now());
+    const noCoins = duration < 60000;
     const ranking = [...room.players.entries()]
       .map(([id, p]) => ({ id, name: p.name, score: p.score, alive: p.alive }))
       .sort((a, b) => (b.alive - a.alive) || (b.score - a.score));
-    broadcast(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null });
+    broadcast(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null, mode: room.mode, noCoins });
   }
 }
 
