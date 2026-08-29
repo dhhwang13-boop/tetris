@@ -158,6 +158,11 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
+    if (msg.type === 'leaveRoom') {
+      ws.deliberateLeave = true;
+      return;
+    }
+
     if (msg.type === 'listRooms') {
       send(ws, roomListPayload());
       return;
@@ -301,15 +306,21 @@ wss.on('connection', (ws, req) => {
       return;
     }
     if (!ws.playerId) return;
+    const wasHost = (room.hostId === ws.playerId);
     room.players.delete(ws.playerId);
+    if (wasHost) {
+      // 호스트가 나가거나 연결이 끊기면 방 전체를 닫고 모두 메인화면으로 보냄
+      clearInterval(room.botInterval); clearTimeout(room.territoryTimer);
+      const reason = ws.deliberateLeave ? 'closed' : 'disconnected';
+      broadcastAll(room, { type: 'roomClosed', reason });
+      rooms.delete(ws.roomId);
+      return;
+    }
     if (room.players.size === 0 && room.spectators.size === 0) {
       clearInterval(room.botInterval); clearTimeout(room.territoryTimer);
       rooms.delete(ws.roomId); return;
     }
     if (room.players.size === 0) return; // 관전자만 남은 경우 방은 유지하되 더 진행할 참가자가 없음
-    if (room.hostId === ws.playerId) {
-      room.hostId = room.players.keys().next().value;
-    }
     if (room.status === 'lobby') {
       broadcast(room, lobbyPayload(room));
     } else if (room.status === 'playing') {
@@ -415,6 +426,7 @@ function startBotSimulation(room){
 }
 function checkEnd(room) {
   if (room.status !== 'playing') return;
+  const alivePlayers = [...room.players.entries()].filter(([, p]) => p.alive);
   const startCount = room.startCount || room.players.size;
   // 살아있는 사람이 1명 이하이거나, 접속 자체가 1명만 남은 경우(나머지 전원 접속 끊김) 모두 종료 처리
   if (startCount >= 2 && (alivePlayers.length <= 1 || room.players.size <= 1)) {
