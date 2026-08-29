@@ -134,13 +134,13 @@
   .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
   .panel-label{ font-size:10px; color:var(--dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; text-align:center; }
 
-  .left-col{ display:flex; flex-direction:column; gap:14px; width:130px; }
+  .left-col{ display:flex; flex-direction:column; gap:14px; width:190px; }
   .left-col.mp-mode{ height:608px; }
   .chat-panel{ flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; position:relative; }
   .chat-log{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
   .chat-line{ font-size:12.5px; line-height:1.5; color:var(--text); word-break:break-word; }
   .chat-line b{ color:var(--cyan); font-weight:700; margin-right:3px; }
-  .chat-input-row{ display:flex; gap:5px; }
+  .chat-input-row{ display:flex; gap:4px; }
   .chat-input-row input[type=text]{
     flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--text);
     padding:7px 8px; border-radius:6px; font-family:inherit; font-size:12.5px; outline:none;
@@ -148,11 +148,11 @@
   .chat-input-row input[type=text]:focus{ border-color:var(--cyan); }
   .chat-emoji-btn{
     font-family:inherit; background:var(--panel2); border:1px solid var(--line); border-radius:6px;
-    cursor:pointer; font-size:15px; padding:0 8px; flex-shrink:0;
+    cursor:pointer; font-size:13px; padding:0; flex-shrink:0; width:26px;
   }
   .chat-emoji-popover{
-    position:absolute; bottom:52px; right:10px; background:var(--panel2); border:1px solid var(--line);
-    border-radius:8px; padding:6px; display:flex; gap:6px; z-index:10;
+    position:absolute; bottom:48px; right:6px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:8px; padding:6px; display:flex; gap:6px; z-index:10; box-shadow:0 6px 16px rgba(0,0,0,.4);
   }
   .chat-emoji-opt{ font-size:20px; background:none; border:none; cursor:pointer; padding:2px 4px; border-radius:6px; }
   .chat-emoji-opt:hover{ background:var(--bg); }
@@ -193,7 +193,8 @@
   .overlay .sub{ color:var(--dim); font-size:11px; }
   .overlay-btns{ display:flex; gap:10px; margin-top:8px; }
   .ov-btn{ font-family:inherit; padding:10px 18px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:12px; letter-spacing:1px; }
-  .ov-btn.main{ background:linear-gradient(90deg,var(--cyan),#7fe8ff); color:#00303c; }
+  .ov-btn.main{ background:linear-gradient(90deg,var(--cyan),#7fe8ff); color:#00303c; transition:background .15s ease, color .15s ease, opacity .15s ease; }
+  .ov-btn.main:disabled{ background:var(--panel2); color:var(--dim); cursor:not-allowed; opacity:.6; }
   .ov-btn.ghost{ background:var(--panel2); color:var(--text); border:1px solid var(--line); }
 
   /* ---------- 멀티플레이 ---------- */
@@ -907,7 +908,7 @@ function applyAllMusicVolumesNow(){ applyBgmVolumeNow(); applyGameBgmVolumeNow()
 document.addEventListener('click', function firstInteractionPlay(){
   const id = currentActiveScreenId();
   if(!bgmStarted && MUSIC_SCREENS.has(id)) startBgmPlayback();
-  if(!gameBgmStarted && id==='screen-game') startGameBgmPlayback();
+  if(!gameBgmStarted && id==='screen-game' && (!mpActive || mpMatchStarted)) startGameBgmPlayback();
 }, { once:false });
 
 // ---------- 효과음 (틱 / 블록배치 / 줄삭제, Web Audio) ----------
@@ -1075,7 +1076,7 @@ document.getElementById('btn-esc-settings').addEventListener('click', ()=>{
 // ---------- 멀티플레이 네트워킹 ----------
 let mpWS = null, mpPlayerId = null, mpRoomId = null, mpIsHost = false, mpIsPrivateRoom = false, mpMyPassword = '';
 let mpOtherIds = [], mpOthers = {};
-let mpRoomMode = 'classic5', mpMatchStarted = false;
+let mpRoomMode = 'classic5', mpMatchStarted = false, mpHostId = null;
 let mpActive = false, mpStateTimer = null, mpRoomListTimer = null, mpPendingJoinRoomId = null;
 const PLAYER_COLORS = ['#3ddbff','#ff5ea8','#ffce45','#52ff9d','#a855f7'];
 const GARBAGE_TABLE = {1:0,2:1,3:2,4:4};
@@ -1296,7 +1297,7 @@ function mpBuildOppSlots(mode, players){
     const opp = others[0];
     if(opp){
       if(!mpOthers[opp.id]) mpOthers[opp.id] = { name:opp.name, color: PLAYER_COLORS[1], alive:true, score:0 };
-      document.getElementById('opp-single-name').textContent = opp.name;
+      document.getElementById('opp-single-name').textContent = opp.name + (opp.id===mpHostId ? ' (호스트)' : '');
       document.getElementById('opp-single-score').textContent = mpOthers[opp.id].score;
     } else {
       document.getElementById('opp-single-name').textContent = '입장 대기중...';
@@ -1315,7 +1316,7 @@ function mpBuildOppSlots(mode, players){
       if(p){
         slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
         if(!mpOthers[p.id]) mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[(i+1)%PLAYER_COLORS.length], alive:true, score:0 };
-        slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}</span><span class="opp-score" id="opp-score-${p.id}">${mpOthers[p.id].score}</span></div>
+        slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.id===mpHostId?' <span style="color:var(--yellow); font-size:9px;">(호스트)</span>':''}</span><span class="opp-score" id="opp-score-${p.id}">${mpOthers[p.id].score}</span></div>
           <canvas id="opp-board-${p.id}" width="120" height="240"></canvas>`;
       } else {
         slot.className = 'opp-slot empty';
@@ -1328,6 +1329,7 @@ function mpBuildOppSlots(mode, players){
 let mpMyReady = false;
 function mpRenderLobby(msg){
   mpIsHost = (msg.hostId === mpPlayerId);
+  mpHostId = msg.hostId;
   mpRoomMode = msg.mode || mpRoomMode;
   document.getElementById('mp-wait-title').textContent = msg.title || msg.roomId;
   document.getElementById('mp-wait-count').textContent = `${msg.players.length}/${msg.max}`;
@@ -1338,13 +1340,12 @@ function mpRenderLobby(msg){
 
   const readyBtn = document.getElementById('mp-waiting-ready-btn');
   const startBtn = document.getElementById('mp-waiting-start-btn');
-  const readyCount = msg.players.filter(p=>p.ready).length;
   if(mpIsHost){
     readyBtn.style.display = 'none';
     startBtn.style.display = 'block';
     const allReady = msg.players.length>=2 && msg.players.every(p=>p.ready);
     startBtn.disabled = !allReady;
-    startBtn.textContent = `게임 시작 (${readyCount}/${msg.players.length} 준비완료)`;
+    startBtn.textContent = '게임 시작';
   } else {
     startBtn.style.display = 'none';
     readyBtn.style.display = 'block';
