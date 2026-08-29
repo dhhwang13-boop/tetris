@@ -242,7 +242,7 @@ const heartbeatInterval = setInterval(() => {
     ws.isAlive = false;
     try { ws.ping(); } catch (e) {}
   });
-}, 30000);
+}, 10000);
 
 // 종료됐지만 정리되지 않은 방(빈 방, 오래된 종료 상태)을 주기적으로 청소 - 무료 서버 메모리 보호
 setInterval(() => {
