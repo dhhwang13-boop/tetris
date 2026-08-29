@@ -206,6 +206,11 @@
     padding:10px 12px; border-radius:6px; font-family:inherit; font-size:14px; outline:none;
   }
   .mp-card input[type=text]:focus{ border-color:var(--cyan); }
+  .mp-select{
+    width:100%; background:var(--bg); border:1px solid var(--line); color:var(--text);
+    padding:10px 12px; border-radius:6px; font-family:inherit; font-size:14px; outline:none; cursor:pointer;
+  }
+  .mp-select:focus{ border-color:var(--cyan); }
   .mp-title{ font-size:16px; font-weight:700; letter-spacing:1px; text-align:center; margin-bottom:4px; }
   .mp-row{ display:flex; gap:10px; margin-top:18px; }
   .mp-row .ov-btn{ flex:1; }
@@ -263,15 +268,29 @@
   .mp-room-list-lg{ max-height:400px; }
   .mp-room-list-lg .mp-room-row{ padding:14px 18px; font-size:14px; }
 
-  .opp-col{ display:flex; flex-direction:column; gap:8px; width:130px; }
-  .opp-card{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; position:relative; }
-  .opp-card .opp-name{ font-size:10px; font-weight:700; margin-bottom:4px; display:flex; justify-content:space-between; }
-  .opp-card .opp-score{ color:var(--dim); }
-  .opp-card canvas{ display:block; margin:0 auto; }
-  .opp-card.dead{ opacity:.35; }
-  .opp-card.dead::after{ content:'OUT'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--bad); font-weight:900; background:rgba(0,0,0,.4); border-radius:8px; }
+  .opp-col-single{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .opp-single-frame{ transform:scale(1); }
+  .opp-single-info{ display:flex; justify-content:space-between; width:300px; font-size:12px; color:var(--dim); padding:0 4px; }
+  .opp-single-info span:first-child{ font-weight:700; color:var(--text); }
+
+  .opp-col-grid{ display:flex; flex-direction:column; gap:8px; width:280px; }
+  .opp-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .opp-slot{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px; position:relative; }
+  .opp-slot.empty{ background:var(--bg2); border:1px solid var(--line); opacity:.4; }
+  .opp-slot .opp-name{ font-size:9px; font-weight:700; margin-bottom:4px; display:flex; justify-content:space-between; }
+  .opp-slot .opp-score{ color:var(--dim); }
+  .opp-slot canvas{ display:block; margin:0 auto; }
+  .opp-slot.dead{ opacity:.35; }
+  .opp-slot.dead::after{ content:'OUT'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--bad); font-weight:900; background:rgba(0,0,0,.4); border-radius:8px; }
+
   .attack-toast{ position:absolute; top:8px; left:50%; transform:translateX(-50%); background:var(--bad); color:#3a0a10; padding:6px 14px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:1px; opacity:0; transition:opacity .2s; z-index:5; white-space:nowrap; }
   .attack-toast.show{ opacity:1; }
+  .combo-toast{
+    position:absolute; top:70px; left:50%; transform:translateX(-50%) scale(0.8); background:var(--yellow); color:#3a2a00;
+    padding:6px 16px; border-radius:20px; font-size:13px; font-weight:900; letter-spacing:1px; opacity:0;
+    transition:opacity .15s, transform .15s; z-index:5; white-space:nowrap;
+  }
+  .combo-toast.show{ opacity:1; transform:translateX(-50%) scale(1); }
   .rank-row{ display:flex; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--line); font-size:12px; }
   .rank-row:last-child{ border-bottom:none; }
   .rank-row .place{ color:var(--yellow); font-weight:900; margin-right:6px; }
@@ -417,6 +436,10 @@
     <div class="mp-title">방 생성</div>
     <label>방 제목 (선택)</label>
     <input type="text" id="mp-room-title" maxlength="20" placeholder="예: 초보만 오세요">
+    <label>모드 선택</label>
+    <select id="mp-mode-select" class="mp-select">
+      <option value="classic">클래식</option>
+    </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
       <label><input type="radio" name="mp-visibility" value="public" checked> 공개</label>
@@ -528,6 +551,7 @@
             </div>
           </div>
           <div class="attack-toast" id="attack-toast"></div>
+          <div class="combo-toast" id="combo-toast"></div>
         </div>
         <div class="controls-help" id="controls-help">
           <b>←/→</b> 이동 &nbsp; <b>↓</b> 소프트드롭 &nbsp; <b>↑</b> 회전 &nbsp; <b>Z</b> 반대회전<br>
@@ -535,16 +559,27 @@
         </div>
       </div>
 
-      <div class="right-col">
+      <div class="right-col" id="right-col">
         <div class="panel">
           <div class="panel-label">Next</div>
           <canvas id="next-canvas" width="96" height="340"></canvas>
         </div>
       </div>
 
-      <div class="opp-col" id="opp-col" style="display:none;">
-        <div class="panel-label" style="text-align:center;">Opponents</div>
-        <div id="opp-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <div class="opp-col-single" id="opp-col-single" style="display:none;">
+        <div class="panel-label" style="text-align:center;">OPPONENT</div>
+        <div class="board-frame opp-single-frame">
+          <canvas id="opp-single-canvas" width="300" height="600"></canvas>
+        </div>
+        <div class="opp-single-info">
+          <span id="opp-single-name">-</span>
+          <span id="opp-single-score">0</span>
+        </div>
+      </div>
+
+      <div class="opp-col-grid" id="opp-col-grid" style="display:none;">
+        <div class="panel-label" style="text-align:center;">OPPONENTS</div>
+        <div class="opp-grid" id="opp-grid"></div>
       </div>
     </div>
   </div>
@@ -603,7 +638,7 @@ function effectiveColor(type){
   return HEX[type];
 }
 function coinsForResult(rank, total){
-  const table = { 2:{1:1,2:0}, 3:{1:2,2:1,3:0}, 4:{1:4,2:2,3:0,4:0} };
+  const table = { 2:{1:1,2:0}, 3:{1:2,2:1,3:0}, 4:{1:4,2:2,3:0,4:0}, 5:{1:5,2:3,3:1,4:0,5:0} };
   const t = table[total] || {};
   return t[rank] || 0;
 }
@@ -993,11 +1028,11 @@ mpServerInput.addEventListener('change', ()=>{
 });
 
 document.getElementById('btn-single').addEventListener('click', ()=>{ showScreen('screen-game'); resetAndStart(); });
-document.getElementById('btn-gameover-menu').addEventListener('click', ()=>{ document.getElementById('opp-col').style.display='none'; showScreen('screen-menu'); });
+document.getElementById('btn-gameover-menu').addEventListener('click', ()=>{ hideOppPanels(); showScreen('screen-menu'); });
 document.getElementById('btn-retry').addEventListener('click', ()=>{ resetAndStart(); });
 document.getElementById('btn-esc-exit').addEventListener('click', ()=>{
   closeEscMenu();
-  stopLoop(); mpDisconnect(); document.getElementById('opp-col').style.display='none';
+  stopLoop(); mpDisconnect(); hideOppPanels();
   showScreen('screen-menu');
 });
 document.getElementById('btn-esc-settings').addEventListener('click', ()=>{
@@ -1009,7 +1044,7 @@ document.getElementById('btn-esc-settings').addEventListener('click', ()=>{
 let mpWS = null, mpPlayerId = null, mpRoomId = null, mpIsHost = false, mpIsPrivateRoom = false, mpMyPassword = '';
 let mpOtherIds = [], mpOthers = {};
 let mpActive = false, mpStateTimer = null, mpRoomListTimer = null, mpPendingJoinRoomId = null;
-const PLAYER_COLORS = ['#3ddbff','#ff5ea8','#ffce45','#52ff9d'];
+const PLAYER_COLORS = ['#3ddbff','#ff5ea8','#ffce45','#52ff9d','#a855f7'];
 const GARBAGE_TABLE = {1:0,2:1,3:2,4:4};
 
 function mpEscapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -1192,7 +1227,7 @@ function mpRenderLobby(msg){
   document.getElementById('mp-ready').style.display = mpIsHost ? 'none' : 'block';
   const slotsEl = document.getElementById('mp-slots');
   slotsEl.innerHTML = '';
-  for(let i=0;i<4;i++){
+  for(let i=0;i<5;i++){
     const p = msg.players[i];
     const div = document.createElement('div');
     if(p){
@@ -1228,12 +1263,29 @@ function mpBeginCountdown(startAt){
 }
 
 function garbageFor(cleared){ return GARBAGE_TABLE[cleared] || 0; }
-function onLinesCleared(cleared){
-  if(cleared>0) playLineClearForCount(cleared);
-  if(mpActive && cleared>0){
-    const g = garbageFor(cleared);
-    if(g>0) mpSend({type:'garbage', amount:g});
+function attackFor(cleared, tspin){
+  if(tspin && tspin.isTSpin){
+    if(tspin.isMini) return cleared>=1 ? 1 : 0;
+    return {1:2,2:4,3:6}[cleared] || 0;
   }
+  return garbageFor(cleared);
+}
+function onLinesCleared(cleared, tspin, combo){
+  if(cleared>0) playLineClearForCount(cleared);
+  if(combo>=2) showComboToast(combo);
+  if(mpActive && cleared>0){
+    const total = attackFor(cleared, tspin) + comboBonus(combo||0);
+    if(total>0) mpSend({type:'garbage', amount: total});
+  }
+}
+let comboToastTimer = null;
+function showComboToast(combo){
+  const el = document.getElementById('combo-toast');
+  if(!el) return;
+  el.textContent = combo + ' COMBO';
+  el.classList.add('show');
+  clearTimeout(comboToastTimer);
+  comboToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 1100);
 }
 function mpIncomingGarbage(amount, from){
   if(!mpActive || eng.gameOver) return;
@@ -1256,14 +1308,24 @@ function mpSendState(){
 function mpApplyOpponentState(msg){
   const info = mpOthers[msg.id]; if(!info) return;
   info.alive = msg.alive; info.score = msg.score;
-  const card = document.getElementById('opp-'+msg.id); if(!card) return;
-  card.classList.toggle('dead', !info.alive);
-  document.getElementById('opp-score-'+msg.id).textContent = info.score;
-  const canvas = document.getElementById('opp-board-'+msg.id); if(!canvas) return;
-  const ctx = canvas.getContext('2d'); const cell = 7;
-  ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,COLS*cell,ROWS*cell);
-  const rows = msg.boardFlat.split('|');
-  for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
+  if(mpLayoutMode === 'single'){
+    document.getElementById('opp-single-score').textContent = info.score;
+    document.getElementById('opp-col-single').classList.toggle('dead', !info.alive);
+    const canvas = document.getElementById('opp-single-canvas'); if(!canvas) return;
+    const ctx = canvas.getContext('2d'); const cell = 30;
+    ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,COLS*cell,ROWS*cell);
+    const rows = msg.boardFlat.split('|');
+    for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
+  } else {
+    const slot = document.getElementById('opp-'+msg.id); if(!slot) return;
+    slot.classList.toggle('dead', !info.alive);
+    const scoreEl = document.getElementById('opp-score-'+msg.id); if(scoreEl) scoreEl.textContent = info.score;
+    const canvas = document.getElementById('opp-board-'+msg.id); if(!canvas) return;
+    const ctx = canvas.getContext('2d'); const cell = 12;
+    ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,COLS*cell,ROWS*cell);
+    const rows = msg.boardFlat.split('|');
+    for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
+  }
 }
 function mpEndGame(ranking){
   mpActive = false;
@@ -1287,12 +1349,12 @@ function mpEndGame(ranking){
   document.getElementById('overlay-mp-end').style.display = 'flex';
 }
 
+let mpLayoutMode = 'single'; // 'single'(2인) | 'grid'(3~5인)
 function startMultiplayerGame(playerList){
   showScreen('screen-game');
   document.getElementById('overlay-gameover').style.display = 'none';
   document.getElementById('overlay-mp-end').style.display = 'none';
   closeEscMenu();
-  document.getElementById('opp-col').style.display = 'flex';
   setLeftColLayout(true);
   document.getElementById('chat-log').innerHTML = '';
   mpActive = true; gameOverHandled = false;
@@ -1304,17 +1366,41 @@ function startMultiplayerGame(playerList){
 
   mpOtherIds = playerList.filter(p=>p.id!==mpPlayerId).map(p=>p.id);
   mpOthers = {};
-  const oppList = document.getElementById('opp-list');
-  oppList.innerHTML = '';
-  playerList.forEach((p,i)=>{
-    if(p.id===mpPlayerId) return;
-    mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[i%4], alive:true, score:0 };
-    const card = document.createElement('div');
-    card.className = 'opp-card'; card.id = 'opp-'+p.id;
-    card.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}</span><span class="opp-score" id="opp-score-${p.id}">0</span></div>
-      <canvas id="opp-board-${p.id}" width="70" height="140"></canvas>`;
-    oppList.appendChild(card);
-  });
+
+  const singleCol = document.getElementById('opp-col-single');
+  const gridCol = document.getElementById('opp-col-grid');
+
+  if(playerList.length <= 2){
+    mpLayoutMode = 'single';
+    singleCol.style.display = 'flex';
+    gridCol.style.display = 'none';
+    const opp = playerList.find(p=>p.id!==mpPlayerId);
+    if(opp){
+      mpOthers[opp.id] = { name:opp.name, color: PLAYER_COLORS[1], alive:true, score:0 };
+      document.getElementById('opp-single-name').textContent = opp.name;
+      document.getElementById('opp-single-score').textContent = '0';
+    }
+  } else {
+    mpLayoutMode = 'grid';
+    singleCol.style.display = 'none';
+    gridCol.style.display = 'flex';
+    const grid = document.getElementById('opp-grid');
+    grid.innerHTML = '';
+    const others = playerList.filter(p=>p.id!==mpPlayerId);
+    for(let i=0;i<4;i++){
+      const p = others[i];
+      const slot = document.createElement('div');
+      if(p){
+        slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
+        mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[(i+1)%PLAYER_COLORS.length], alive:true, score:0 };
+        slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}</span><span class="opp-score" id="opp-score-${p.id}">0</span></div>
+          <canvas id="opp-board-${p.id}" width="120" height="240"></canvas>`;
+      } else {
+        slot.className = 'opp-slot empty';
+      }
+      grid.appendChild(slot);
+    }
+  }
 
   renderAll();
   document.removeEventListener('keydown', onKeyDown);
@@ -1328,23 +1414,29 @@ function startMultiplayerGame(playerList){
   mpSendState();
 }
 
-// ---- 좌측 패널 레이아웃 전환 (싱글: HOLD→STATS / 멀티: STATS→HOLD→채팅) ----
+function hideOppPanels(){
+  document.getElementById('opp-col-single').style.display = 'none';
+  document.getElementById('opp-col-grid').style.display = 'none';
+}
+// ---- 좌측 패널 레이아웃 전환 (싱글: 좌측에 HOLD+STATS / 멀티: 좌측 HOLD+채팅, STATS는 NEXT 옆으로) ----
 function setLeftColLayout(isMulti){
   const left = document.getElementById('left-col');
+  const rightCol = document.getElementById('right-col');
   const holdPanel = document.getElementById('hold-panel');
   const statsPanel = document.getElementById('stats-panel');
   const chatPanel = document.getElementById('chat-panel');
   left.classList.toggle('mp-mode', isMulti);
   if(isMulti){
-    left.insertBefore(statsPanel, holdPanel);
-    holdPanel.style.display = 'none';
+    left.appendChild(holdPanel);
+    left.appendChild(chatPanel);
+    rightCol.appendChild(statsPanel);
+    holdPanel.style.display = 'block';
     chatPanel.style.display = 'flex';
-    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>Esc</b> 메뉴';
   } else {
-    left.insertBefore(holdPanel, statsPanel);
+    left.appendChild(holdPanel);
+    left.appendChild(statsPanel);
     holdPanel.style.display = 'block';
     chatPanel.style.display = 'none';
-    document.getElementById('controls-help-extra').innerHTML = '<b>Space</b> 하드드롭 &nbsp; <b>C</b> 홀드 &nbsp; <b>Esc</b> 메뉴';
   }
 }
 
@@ -1398,6 +1490,7 @@ function newEngine(){
     board: Array.from({length:ROWS}, ()=>Array(COLS).fill(0)),
     queue: [], held: null, holdUsed: false,
     cur: null, score:0, lines:0, level:1, gameOver:false, paused:false,
+    combo:0, lastMoveWasRotation:false,
   };
 }
 function ensureQueue(e){ while(e.queue.length < 6) e.queue.push(...bag7()); }
@@ -1409,6 +1502,7 @@ function spawnFromQueue(e){
   const size = m.length;
   const x = Math.floor((COLS-size)/2);
   e.cur = { type, m, x, y:-1 };
+  e.lastMoveWasRotation = false;
   if(collide(e, e.cur.m, e.cur.x, e.cur.y)) e.gameOver = true;
 }
 function collide(e, m, x, y){
@@ -1427,6 +1521,35 @@ function ghostY(e){
   while(!collide(e, e.cur.m, e.cur.x, gy+1)) gy++;
   return gy;
 }
+function isCornerFilled(e, cx, cy){
+  if(cx<0||cx>=COLS||cy<0||cy>=ROWS) return true;
+  return !!e.board[cy][cx];
+}
+function detectTSpin(e){
+  if(!e.cur || e.cur.type !== 'T' || !e.lastMoveWasRotation) return {isTSpin:false, isMini:false};
+  const {x,y,m} = e.cur;
+  const n = m.length;
+  const tl = isCornerFilled(e, x, y);
+  const tr = isCornerFilled(e, x+n-1, y);
+  const bl = isCornerFilled(e, x, y+n-1);
+  const br = isCornerFilled(e, x+n-1, y+n-1);
+  const total = tl+tr+bl+br;
+  if(total < 3) return {isTSpin:false, isMini:false};
+  const top=m[0][1], bottom=m[n-1][1], left=m[1][0], right=m[1][n-1];
+  let pointDir;
+  if(!bottom) pointDir='up';
+  else if(!top) pointDir='down';
+  else if(!left) pointDir='right';
+  else pointDir='left';
+  let front;
+  if(pointDir==='up') front=[tl,tr];
+  else if(pointDir==='down') front=[bl,br];
+  else if(pointDir==='right') front=[tr,br];
+  else front=[tl,bl];
+  const frontCount = (front[0]?1:0) + (front[1]?1:0);
+  return { isTSpin:true, isMini: frontCount<2 };
+}
+function comboBonus(combo){ return combo>=2 ? Math.floor(combo/2) : 0; }
 function lock(e){
   const {m,x,y,type}=e.cur; const n=m.length;
   for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(!m[r][c]) continue; const bx=x+c, by=y+r; if(by>=0&&by<ROWS&&bx>=0&&bx<COLS) e.board[by][bx]=type; }
@@ -1452,32 +1575,36 @@ function tryMove(e, dx, dy){
   const nx=e.cur.x+dx, ny=e.cur.y+dy;
   if(collide(e,e.cur.m,nx,ny)) return false;
   e.cur.x=nx; e.cur.y=ny;
+  e.lastMoveWasRotation = false;
   playTick();
   return true;
 }
 function tryRotate(e, dir){
   if(!e.cur||e.gameOver||e.paused) return;
   const m2 = dir>0 ? rotateCW(e.cur.m) : rotateCCW(e.cur.m);
-  for(const k of [0,-1,1,-2,2]){ if(!collide(e, m2, e.cur.x+k, e.cur.y)){ e.cur.m=m2; e.cur.x+=k; playTick(); return; } }
+  for(const k of [0,-1,1,-2,2]){ if(!collide(e, m2, e.cur.x+k, e.cur.y)){ e.cur.m=m2; e.cur.x+=k; e.lastMoveWasRotation=true; playTick(); return; } }
 }
 function hardDrop(e){
-  if(!e.cur||e.gameOver||e.paused) return;
+  if(!e.cur||e.gameOver||e.paused) return {cleared:0, tspin:{isTSpin:false,isMini:false}, combo:e.combo||0};
   const dist = ghostY(e) - e.cur.y;
   e.cur.y = ghostY(e);
   e.score += Math.max(0, dist)*2;
+  const tspin = detectTSpin(e);
   const cleared = lock(e);
+  e.combo = cleared>0 ? (e.combo||0)+1 : 0;
   if(!e.gameOver) spawnFromQueue(e);
-  return cleared;
+  return {cleared, tspin, combo:e.combo};
 }
 function softDropStep(e){
-  if(!e.cur||e.gameOver||e.paused) return -1;
-  if(!collide(e, e.cur.m, e.cur.x, e.cur.y+1)){ e.cur.y++; e.score += 1; playTick(); return -1; }
+  if(!e.cur||e.gameOver||e.paused) return {cleared:-1, tspin:{isTSpin:false,isMini:false}, combo:e.combo||0};
+  if(!collide(e, e.cur.m, e.cur.x, e.cur.y+1)){ e.cur.y++; e.score += 1; e.lastMoveWasRotation=false; playTick(); return {cleared:-1, tspin:{isTSpin:false,isMini:false}, combo:e.combo||0}; }
+  const tspin = detectTSpin(e);
   const cleared = lock(e);
+  e.combo = cleared>0 ? (e.combo||0)+1 : 0;
   if(!e.gameOver) spawnFromQueue(e);
-  return cleared;
+  return {cleared, tspin, combo:e.combo};
 }
 function holdPiece(e){
-  if(mpActive) return;
   if(!e.cur||e.gameOver||e.paused||e.holdUsed) return;
   const curType = e.cur.type;
   if(e.held === null){
@@ -1488,6 +1615,7 @@ function holdPiece(e){
     const m = SHAPES[swap].map(r=>r.slice());
     const size = m.length;
     e.cur = { type: swap, m, x: Math.floor((COLS-size)/2), y:-1 };
+    e.lastMoveWasRotation = false;
   }
   e.holdUsed = true;
 }
@@ -1600,7 +1728,7 @@ function onKeyDown(e){
     case 'ArrowUp': tryRotate(eng,1); renderAll(); break;
     case 'z': case 'Z': tryRotate(eng,-1); renderAll(); break;
     case 'c': case 'C': case 'Shift': holdPiece(eng); renderAll(); break;
-    case ' ': { const cleared = hardDrop(eng); playBlockPlace(); onLinesCleared(cleared); } renderAll(); checkGameOver(); break;
+    case ' ': { const r = hardDrop(eng); playBlockPlace(); onLinesCleared(r.cleared, r.tspin, r.combo); } renderAll(); checkGameOver(); break;
   }
 }
 function onKeyUp(e){
@@ -1639,13 +1767,19 @@ function loop(ts){
     }
     if(keyState.down){
       softAcc += dt;
-      while(softAcc >= SOFT_ARR){ const cleared = softDropStep(eng); if(cleared>=0) onLinesCleared(cleared); softAcc -= SOFT_ARR; checkGameOver(); }
+      while(softAcc >= SOFT_ARR){ const r = softDropStep(eng); if(r.cleared>=0) onLinesCleared(r.cleared, r.tspin, r.combo); softAcc -= SOFT_ARR; checkGameOver(); }
     }
     gravityAcc += dt;
     const gi = gravityInterval();
     while(gravityAcc >= gi){
-      if(!collide(eng, eng.cur.m, eng.cur.x, eng.cur.y+1)){ eng.cur.y++; }
-      else { const cleared = lock(eng); onLinesCleared(cleared); if(!eng.gameOver) spawnFromQueue(eng); }
+      if(!collide(eng, eng.cur.m, eng.cur.x, eng.cur.y+1)){ eng.cur.y++; eng.lastMoveWasRotation=false; }
+      else {
+        const tspin = detectTSpin(eng);
+        const cleared = lock(eng);
+        eng.combo = cleared>0 ? (eng.combo||0)+1 : 0;
+        onLinesCleared(cleared, tspin, eng.combo);
+        if(!eng.gameOver) spawnFromQueue(eng);
+      }
       gravityAcc -= gi;
       checkGameOver();
     }
@@ -1693,7 +1827,7 @@ function resetAndStart(){
   document.getElementById('overlay-gameover').style.display = 'none';
   document.getElementById('overlay-mp-end').style.display = 'none';
   closeEscMenu();
-  document.getElementById('opp-col').style.display = 'none';
+  hideOppPanels();
   setLeftColLayout(false);
   mpActive = false; gameOverHandled = false;
   eng = newEngine();
