@@ -307,6 +307,12 @@
     cursor:pointer; z-index:3;
   }
   .opp-slot.empty:hover .bot-add-btn{ display:flex; }
+  .bot-remove-btn{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:36px; height:36px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--bad); color:var(--bad); font-size:22px; font-weight:900;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:3; line-height:1;
+  }
+  .bot-remove-btn:hover{ background:var(--bad); color:#2a0000; }
   .territory-col{ display:flex; flex-direction:column; align-items:center; gap:10px; width:280px; }
   .territory-timer{ font-size:28px; font-weight:900; color:var(--yellow); letter-spacing:1px; }
   #territory-canvas{ border:1px solid var(--line); border-radius:6px; }
@@ -1470,8 +1476,12 @@ function mpBuildOppSlots(mode, players){
       if(p){
         slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
         if(!mpOthers[p.id]) mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[(i+1)%PLAYER_COLORS.length], alive:true, score:0 };
+        const removeBtn = (p.isBot && mpIsHost) ? `<div class="bot-remove-btn" title="봇 제거" data-bot-id="${p.id}">−</div>` : '';
         slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.id===mpHostId?' <span style="color:var(--yellow); font-size:9px;">(호스트)</span>':''}</span><span class="opp-score" id="opp-score-${p.id}">${mpOthers[p.id].score||0}</span></div>
-          <canvas id="opp-board-${p.id}" width="120" height="240"></canvas>`;
+          <canvas id="opp-board-${p.id}" width="120" height="240"></canvas>${removeBtn}`;
+        if(removeBtn){
+          slot.querySelector('.bot-remove-btn').addEventListener('click', (e)=>{ e.stopPropagation(); mpSend({type:'removeBot', botId:p.id}); });
+        }
       } else {
         slot.className = 'opp-slot empty';
         const showBotBtn = (mode === 'territory' && mpIsHost && !mpIsSpectator);
@@ -1563,7 +1573,7 @@ function onLinesCleared(cleared, tspin, combo){
   if(mpActive && cleared>0){
     const total = attackFor(cleared, tspin) + comboBonus(combo||0);
     if(mpRoomMode === 'territory'){
-      const captureAmount = Math.min(total, 6); // 한 번에 너무 많은 땅을 먹지 않도록 상한
+      const captureAmount = Math.min(cleared, 6); // 땅 점령은 지운 줄 수에 직접 비례 (1줄=1칸, 2줄=2칸...)
       if(captureAmount>0) mpSend({type:'territoryCapture', amount: captureAmount});
       if(total>0) mpSend({type:'garbage', amount: total});
     } else if(total>0){
