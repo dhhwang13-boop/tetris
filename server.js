@@ -404,8 +404,23 @@ function endTerritoryMatch(room){
   broadcastAll(room, { type: 'territoryEnd', ranking, mode: room.mode, humanCount, noCoinIds });
   room.status = 'lobby';
   room.land = null;
-  for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; }
+  for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; p.simFill = 0; }
   broadcastAll(room, lobbyPayload(room));
+}
+const BOT_COLS = 10, BOT_ROWS = 20;
+function botBoardFlat(fillLevel){
+  const rows = [];
+  for (let r = 0; r < BOT_ROWS; r++) {
+    if (r < BOT_ROWS - fillLevel) {
+      rows.push('0'.repeat(BOT_COLS));
+    } else {
+      const row = Array(BOT_COLS).fill('1');
+      const gaps = 1 + Math.floor(Math.random() * 2);
+      for (let g = 0; g < gaps; g++) row[Math.floor(Math.random() * BOT_COLS)] = '0';
+      rows.push(row.join(''));
+    }
+  }
+  return rows.join('|');
 }
 function startBotSimulation(room){
   clearInterval(room.botInterval);
@@ -414,14 +429,18 @@ function startBotSimulation(room){
     let changed = false;
     for (const [id, p] of room.players) {
       if (!p.isBot || !p.alive) continue;
+      // 봇도 실제로 블록을 쌓고 있는 것처럼 보이도록 매 틱마다 보드를 조금씩 채움
+      p.simFill = Math.min(BOT_ROWS - 2, (p.simFill || 0) + 1 + Math.floor(Math.random() * 2));
       if (Math.random() < 0.55) {
         const cleared = 1 + Math.floor(Math.random() * 2);
         p.score += cleared * 100;
+        p.simFill = Math.max(0, p.simFill - cleared);
         if (room.mode === 'territory') { captureCells(room, id, cleared); changed = true; }
       }
+      broadcastAll(room, { type: 'opponentState', id, score: p.score, lines: 0, alive: true, boardFlat: botBoardFlat(p.simFill) });
     }
     if (changed) broadcastTerritoryUpdate(room);
-  }, 3000);
+  }, 1500);
 }
 function checkEnd(room) {
   if (room.status !== 'playing') return;
@@ -442,7 +461,7 @@ function checkEnd(room) {
     broadcastAll(room, { type: 'end', ranking, winnerId: alivePlayers[0] ? alivePlayers[0][0] : null, mode: room.mode, noCoins, noCoinIds });
     // 종료 후 방을 나가지 않고 대기실로 복귀 (호스트만 자동 준비, 나머지는 재준비 필요)
     room.status = 'lobby';
-    for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; }
+    for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; p.simFill = 0; }
     broadcastAll(room, lobbyPayload(room));
   }
 }
