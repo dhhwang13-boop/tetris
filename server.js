@@ -59,7 +59,7 @@ function botEvalBoard(board, clearedLines){
   const aggHeight = heights.reduce((a, b) => a + b, 0);
   let bump = 0;
   for (let i = 0; i < BOT_COLS - 1; i++) bump += Math.abs(heights[i] - heights[i + 1]);
-  return -0.51 * aggHeight + 0.76 * clearedLines - 0.36 * holes - 0.18 * bump;
+  return -0.51 * aggHeight + 1.2 * clearedLines - 0.36 * holes - 0.18 * bump;
 }
 // 현재 조각 하나를 최적 위치(모든 회전 x 모든 열)로 실제로 놓아보고 그 중 가장 좋은 수를 둠
 function botPlaceBestPiece(bot){
@@ -245,6 +245,17 @@ wss.on('connection', (ws, req) => {
       const botId = 'bot_' + uid();
       const botNum = [...room.players.values()].filter(p => p.isBot).length + 1;
       room.players.set(botId, { ws: null, name: '봇 ' + botNum, ready: true, alive: true, score: 0, lines: 0, isBot: true });
+      broadcast(room, lobbyPayload(room));
+      return;
+    }
+
+    if (msg.type === 'removeBot') {
+      const room = rooms.get(ws.roomId);
+      if (!room || ws.playerId !== room.hostId) return;
+      if (room.status !== 'lobby') return;
+      const target = room.players.get(msg.botId);
+      if (!target || !target.isBot) return;
+      room.players.delete(msg.botId);
       broadcast(room, lobbyPayload(room));
       return;
     }
@@ -540,10 +551,11 @@ function startBotSimulation(room){
       } else if (result.cleared > 0) {
         bot.combo = (bot.combo || 0) + 1;
         const comboBonus = bot.combo >= 2 ? Math.floor(bot.combo / 2) : 0;
-        const amount = Math.min((BOT_GARBAGE_TABLE[result.cleared] || 0) + comboBonus, 6);
+        const attackAmount = Math.min((BOT_GARBAGE_TABLE[result.cleared] || 0) + comboBonus, 6);
+        const captureAmount = Math.min(result.cleared, 6);
         p.score += result.cleared * 100;
-        if (room.mode === 'territory' && amount > 0) { captureCells(room, id, amount); broadcastTerritoryUpdate(room); }
-        if (amount > 0) applyPlayerAttack(room, id, p.name, amount);
+        if (room.mode === 'territory' && captureAmount > 0) { captureCells(room, id, captureAmount); broadcastTerritoryUpdate(room); }
+        if (attackAmount > 0) applyPlayerAttack(room, id, p.name, attackAmount);
       } else {
         bot.combo = 0;
       }
