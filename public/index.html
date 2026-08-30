@@ -314,6 +314,24 @@
   }
   .bot-remove-btn:hover{ background:var(--bad); color:#2a0000; }
   .territory-col{ display:flex; flex-direction:column; align-items:center; gap:10px; width:280px; }
+  .defense-col{ display:flex; flex-direction:column; align-items:center; gap:8px; width:280px; }
+  .defense-round-label{ font-size:13px; font-weight:900; color:var(--cyan); letter-spacing:1px; }
+  .defense-asset-wrap{ position:relative; width:280px; height:300px; border:1px solid var(--line); border-radius:8px; background:#0d1420; overflow:hidden; }
+  .defense-timer{ position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:20px; font-weight:900; color:var(--yellow); z-index:4; }
+  #defense-canvas{ position:absolute; top:0; left:0; }
+  .defense-center-overlay{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:5;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .defense-license{ font-size:9px; color:var(--dim); text-align:center; max-width:220px; }
+  .defense-hp-row{ display:flex; align-items:center; gap:6px; width:100%; }
+  .defense-hp-num{ font-size:14px; font-weight:900; color:var(--bad); width:28px; text-align:right; }
+  .defense-hp-max{ font-size:11px; color:var(--dim); }
+  .defense-hp-track{ flex:1; height:14px; background:var(--bg2); border-radius:7px; overflow:hidden; border:1px solid var(--line); }
+  .defense-hp-fill{ height:100%; background:linear-gradient(90deg,#ff5468,#ff8a4a); transition:width .3s; }
+  .defense-boards{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; width:100%; }
+  .defense-boards .opp-slot{ min-height:auto; padding:4px; }
+  .defense-boards .opp-name{ font-size:9px; }
   .territory-timer{ font-size:28px; font-weight:900; color:var(--yellow); letter-spacing:1px; }
   #territory-canvas{ border:1px solid var(--line); border-radius:6px; }
   .territory-legend{ display:flex; flex-direction:column; gap:6px; width:100%; }
@@ -497,6 +515,7 @@
       <option value="classic2">클래식 (2인)</option>
       <option value="classic5">클래식 (5인)</option>
       <option value="territory">땅따먹기 (4인)</option>
+      <option value="defense">침공저지 (4인 협동)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -667,6 +686,25 @@
         <canvas id="territory-canvas" width="280" height="280"></canvas>
         <div class="territory-legend" id="territory-legend"></div>
         <div class="opp-grid" id="territory-opp-grid"></div>
+      </div>
+
+      <div class="defense-col" id="defense-col" style="display:none;">
+        <div class="defense-round-label" id="defense-round-label">ROUND 1</div>
+        <div class="defense-asset-wrap">
+          <div class="defense-timer" id="defense-timer">01:00</div>
+          <canvas id="defense-canvas" width="280" height="300"></canvas>
+          <div class="defense-center-overlay">
+            <button class="ov-btn main" id="defense-start-btn" style="display:none; width:150px;">게임 시작</button>
+            <button class="ov-btn main" id="defense-ready-btn" style="display:none; width:150px;">게임 준비</button>
+            <div class="defense-license">캐릭터 스프라이트: Liberated Pixel Cup (CC-BY-SA 3.0)</div>
+          </div>
+        </div>
+        <div class="defense-hp-row">
+          <span class="defense-hp-num" id="defense-hp-num">100</span>
+          <div class="defense-hp-track"><div class="defense-hp-fill" id="defense-hp-fill"></div></div>
+          <span class="defense-hp-max">/100</span>
+        </div>
+        <div class="defense-boards" id="defense-boards"></div>
       </div>
     </div>
   </div>
@@ -1216,6 +1254,9 @@ function mpHandleMessage(msg){
       mpRenderTerritoryLegend();
       break;
     case 'territoryEnd': mpEndTerritoryMatch(msg.ranking, msg.humanCount, msg.noCoinIds); break;
+    case 'defenseUpdate': mpApplyDefenseUpdate(msg); break;
+    case 'defenseRoundClear': mpShowDefenseRoundClear(msg); break;
+    case 'defenseEnd': mpEndDefenseGame(msg); break;
     case 'roomClosed': mpHandleRoomClosed(msg.reason); break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
     case 'chat':
@@ -1286,9 +1327,10 @@ function mpRefreshRoomList(){
 }
 document.getElementById('mp-refresh').addEventListener('click', mpRefreshRoomList);
 
-function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; return 5; }
+function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; return 5; }
 function mpModeLabel(mode){
   if(mode === 'territory') return '땅따먹기';
+  if(mode === 'defense') return '침공저지';
   if(mode === 'classic2') return '클래식(2인)';
   return '클래식(5인)';
 }
@@ -1484,7 +1526,7 @@ function mpBuildOppSlots(mode, players){
         }
       } else {
         slot.className = 'opp-slot empty';
-        const showBotBtn = (mode === 'territory' && mpIsHost && !mpIsSpectator);
+        const showBotBtn = ((mode === 'territory' || mode === 'defense') && mpIsHost && !mpIsSpectator);
         slot.innerHTML = `<div class="opp-empty-label">입장대기중</div>${showBotBtn ? '<div class="bot-add-btn" title="봇 추가">+</div>' : ''}`;
         if(showBotBtn){
           slot.querySelector('.bot-add-btn').addEventListener('click', (e)=>{ e.stopPropagation(); mpSend({type:'addBot'}); });
@@ -1514,6 +1556,39 @@ function mpRenderLobby(msg){
   mpRoomMode = msg.mode || mpRoomMode;
   document.getElementById('mp-wait-title').textContent = msg.title || msg.roomId;
   document.getElementById('mp-wait-count').textContent = `${msg.players.length}/${msg.max}`;
+
+  if(mpRoomMode === 'defense'){
+    document.getElementById('opp-col-single').style.display = 'none';
+    document.getElementById('opp-col-grid').style.display = 'none';
+    document.getElementById('territory-col').style.display = 'none';
+    document.getElementById('mp-ready-box').style.display = 'none';
+    document.getElementById('defense-col').style.display = 'flex';
+    document.getElementById('defense-round-label').textContent = '대기중';
+    document.getElementById('defense-timer').textContent = '--:--';
+    document.getElementById('defense-hp-num').textContent = 100;
+    document.getElementById('defense-hp-fill').style.width = '100%';
+    mpBuildDefenseBoards(msg.players, true);
+    mpClearReadyChecks();
+    msg.players.forEach(p=>{ if(p.id!==mpPlayerId && p.ready) mpShowReadyCheck(p.id); });
+
+    const dReadyBtn = document.getElementById('defense-ready-btn');
+    const dStartBtn = document.getElementById('defense-start-btn');
+    if(mpIsHost){
+      dReadyBtn.style.display = 'none';
+      dStartBtn.style.display = 'block'; dStartBtn.disabled = false;
+      const allReady = msg.players.length>=2 && msg.players.every(p=>p.ready);
+      dStartBtn.disabled = !allReady;
+    } else {
+      dStartBtn.style.display = 'none';
+      dReadyBtn.style.display = 'block'; dReadyBtn.disabled = false;
+      const me = msg.players.find(p=>p.id===mpPlayerId);
+      mpMyReady = !!(me && me.ready);
+      dReadyBtn.textContent = mpMyReady ? '취소' : '게임 준비';
+    }
+    return;
+  }
+  document.getElementById('mp-ready-box').style.display = 'flex';
+  document.getElementById('defense-col').style.display = 'none';
 
   mpBuildOppSlots(mpRoomMode, msg.players);
   mpClearReadyChecks();
@@ -1576,6 +1651,8 @@ function onLinesCleared(cleared, tspin, combo){
       const captureAmount = Math.min(cleared, 6); // 땅 점령은 지운 줄 수에 직접 비례 (1줄=1칸, 2줄=2칸...)
       if(captureAmount>0) mpSend({type:'territoryCapture', amount: captureAmount});
       if(total>0) mpSend({type:'garbage', amount: total});
+    } else if(mpRoomMode === 'defense'){
+      mpSend({type:'defenseAttack', amount: Math.min(cleared, 4)});
     } else if(total>0){
       mpSend({type:'garbage', amount: total});
     }
@@ -1591,7 +1668,7 @@ function showComboToast(combo){
   comboToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 1100);
 }
 function triggerGameOverOrFreeze(e){
-  if(mpActive && mpRoomMode === 'territory'){
+  if(mpActive && (mpRoomMode === 'territory' || mpRoomMode === 'defense')){
     e.frozen = true;
     e.frozenUntil = Date.now() + 5000;
     e.cur = null;
@@ -1708,6 +1785,136 @@ function mpEndTerritoryMatch(ranking, humanCount, noCoinIds){
   updateGameBgmForScreen('screen-game');
 }
 
+function mpBuildDefenseBoards(players, showControls){
+  const grid = document.getElementById('defense-boards');
+  grid.innerHTML = '';
+  mpOthers = {};
+  const maxSlots = mpModeMax('defense');
+  for(let i=0;i<maxSlots;i++){
+    const p = players[i];
+    const slot = document.createElement('div');
+    if(!p){
+      slot.className = 'opp-slot empty';
+      const showBotBtn = (showControls && mpIsHost && !mpIsSpectator);
+      slot.innerHTML = `<div class="opp-empty-label">입장대기중</div>${showBotBtn ? '<div class="bot-add-btn" title="봇 추가">+</div>' : ''}`;
+      if(showBotBtn){
+        slot.querySelector('.bot-add-btn').addEventListener('click', (e)=>{ e.stopPropagation(); mpSend({type:'addBot'}); });
+      }
+      grid.appendChild(slot);
+      continue;
+    }
+    const isMe = p.id === mpPlayerId;
+    slot.className = 'opp-slot';
+    slot.id = isMe ? 'defense-self-slot' : 'opp-'+p.id;
+    if(!isMe) mpOthers[p.id] = { name:p.name, color:'#3ddbff', alive:true, score:0 };
+    const label = isMe ? (mpEscapeHtml(p.name)+' (나)') : (mpEscapeHtml(p.name)+(p.isBot?' 🤖':''));
+    const removeBtn = (showControls && p.isBot && mpIsHost) ? `<div class="bot-remove-btn" title="봇 제거" data-bot-id="${p.id}">−</div>` : '';
+    slot.innerHTML = `<div class="opp-name"><span>${label}</span><span class="opp-score" id="${isMe?'defense-self-score':'opp-score-'+p.id}">0</span></div>
+      <canvas id="${isMe?'defense-self-board':'opp-board-'+p.id}" width="80" height="160"></canvas>${removeBtn}`;
+    if(removeBtn){
+      slot.querySelector('.bot-remove-btn').addEventListener('click', (e)=>{ e.stopPropagation(); mpSend({type:'removeBot', botId:p.id}); });
+    }
+    grid.appendChild(slot);
+  }
+}
+function mpRenderDefenseSelfBoard(){
+  if(mpRoomMode !== 'defense' || !mpActive || !eng) return;
+  const canvas = document.getElementById('defense-self-board');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d'); const cell = canvas.width / COLS;
+  ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ if(eng.board[r][c]){ ctx.fillStyle = '#3ddbff'; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
+  const scoreEl = document.getElementById('defense-self-score'); if(scoreEl) scoreEl.textContent = eng.score;
+}
+const monsterWalkImg = new Image(); monsterWalkImg.src = 'assets/monster-walk.png';
+const bossImg = new Image(); bossImg.src = 'assets/boss.png';
+const MONSTER_FRAME_SIZE = 64, MONSTER_FRAME_COUNT = 9;
+const monsterTintCanvas = document.createElement('canvas');
+monsterTintCanvas.width = MONSTER_FRAME_SIZE; monsterTintCanvas.height = MONSTER_FRAME_SIZE;
+const monsterTintCtx = monsterTintCanvas.getContext('2d');
+function drawDefenseMonster(ctx, x, y, type, scale){
+  const size = 26 * scale;
+  if(type === 'boss'){
+    if(bossImg.complete && bossImg.naturalWidth>0){
+      ctx.drawImage(bossImg, x-size/2, y-size/2, size, size);
+    } else {
+      ctx.fillStyle = '#8a2be2'; ctx.beginPath(); ctx.arc(x,y,size/2,0,Math.PI*2); ctx.fill();
+    }
+    return;
+  }
+  if(monsterWalkImg.complete && monsterWalkImg.naturalWidth>0){
+    const frame = Math.floor(Date.now()/120) % MONSTER_FRAME_COUNT;
+    monsterTintCtx.clearRect(0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
+    monsterTintCtx.drawImage(monsterWalkImg, frame*MONSTER_FRAME_SIZE, 0, MONSTER_FRAME_SIZE, MONSTER_FRAME_SIZE, 0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
+    monsterTintCtx.globalCompositeOperation = 'source-atop';
+    monsterTintCtx.fillStyle = type==='wraith' ? 'rgba(90,70,190,0.6)' : 'rgba(70,190,90,0.55)';
+    monsterTintCtx.fillRect(0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
+    monsterTintCtx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(monsterTintCanvas, x-size/2, y-size/2, size, size);
+  } else {
+    const bodyColor = type==='wraith' ? '#4a6fa5' : '#5a9e4a';
+    ctx.fillStyle = bodyColor; ctx.beginPath(); ctx.arc(x,y,size/2,0,Math.PI*2); ctx.fill();
+  }
+}
+function mpRenderDefenseMonsters(msg){
+  const canvas = document.getElementById('defense-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0d1420'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  for(let i=0;i<canvas.width;i+=20){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+  const laneCount = 5;
+  (msg.monsters||[]).forEach((m,idx)=>{
+    const lane = idx % laneCount;
+    const x = 30 + lane * ((canvas.width-60)/(laneCount-1));
+    const y = 40 + m.progress * (canvas.height-70);
+    drawDefenseMonster(ctx, x, y, m.type, 1);
+  });
+  if(msg.boss){
+    const x = canvas.width/2;
+    const y = 50 + msg.boss.progress * (canvas.height-90);
+    drawDefenseMonster(ctx, x, y, 'boss', 2.2);
+    ctx.fillStyle = '#2a0000'; ctx.fillRect(x-40,y-46,80,7);
+    ctx.fillStyle = '#ff5468'; ctx.fillRect(x-40,y-46,Math.max(0,80*(msg.boss.hp/msg.boss.maxHp)),7);
+  }
+}
+function mpApplyDefenseUpdate(msg){
+  const label = document.getElementById('defense-round-label');
+  if(label) label.textContent = 'ROUND ' + msg.round + (msg.round===5 ? ' (보스)' : '');
+  const hpNum = document.getElementById('defense-hp-num'); if(hpNum) hpNum.textContent = msg.teamHp;
+  const hpFill = document.getElementById('defense-hp-fill'); if(hpFill) hpFill.style.width = Math.max(0, msg.teamHp/msg.maxHp*100)+'%';
+  const remain = Math.max(0, Math.ceil(msg.roundRemainMs/1000));
+  const m = Math.floor(remain/60), s = remain%60;
+  const timerEl = document.getElementById('defense-timer'); if(timerEl) timerEl.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  mpRenderDefenseMonsters(msg);
+}
+function mpShowDefenseRoundClear(msg){
+  showMpResultToast(
+    `<div style="font-size:16px;">라운드 ${msg.clearedRound} 클리어! 🪙 +1</div>` +
+    `<div style="font-size:12px; color:var(--dim); font-weight:400; margin-top:4px;">라운드 ${msg.nextRound} 시작...</div>`
+  );
+}
+function mpEndDefenseGame(msg){
+  mpMatchStarted = false;
+  clearInterval(mpStateTimer);
+  running = false;
+  if(rafId) cancelAnimationFrame(rafId);
+  if(eng) eng.gameOver = true;
+  const mine = (msg.results||[]).find(r=>r.id===mpPlayerId);
+  const goldWon = mine ? mine.gold : 0;
+  if(goldWon>0) addCoins(goldWon);
+  reportMpResult(!!msg.success);
+  const title = msg.success ? '🏆 보스 처치! 방어 성공!' : `게임 종료 (라운드 ${msg.roundReached}까지 도달)`;
+  showMpResultToast(
+    `<div style="font-size:17px; margin-bottom:6px;">${title}</div>` +
+    (goldWon>0 ? `<div style="color:var(--yellow);">🪙 +${goldWon} 코인 획득!</div>` : '')
+  );
+  mpShowWaitingVisuals();
+  updateGameBgmForScreen('screen-game');
+}
+document.getElementById('defense-start-btn').addEventListener('click', ()=>{ mpSend({type:'start'}); });
+document.getElementById('defense-ready-btn').addEventListener('click', ()=>{ mpSend({type:'ready', ready: !mpMyReady}); });
+
 let mpLayoutMode = 'single'; // 'single'(2인) | 'grid'(3~5인)
 let mpTerritoryOrder = [], mpTerritoryTimerHandle = null, mpMyFlagIndex = -1;
 function startMultiplayerGame(msg){
@@ -1729,6 +1936,7 @@ function startMultiplayerGame(msg){
   document.getElementById('opp-col-single').style.display = 'none';
   document.getElementById('opp-col-grid').style.display = 'none';
   document.getElementById('territory-col').style.display = 'none';
+  document.getElementById('defense-col').style.display = 'none';
   clearInterval(mpTerritoryTimerHandle);
 
   if(mpRoomMode === 'territory'){
@@ -1756,11 +1964,23 @@ function startMultiplayerGame(msg){
         <canvas id="topp-board-${p.id}" width="80" height="160"></canvas>`;
       territoryOppGrid.appendChild(slot);
     });
+  } else if(mpRoomMode === 'defense'){
+    document.getElementById('defense-col').style.display = 'flex';
+    document.getElementById('defense-start-btn').style.display = 'none';
+    document.getElementById('defense-ready-btn').style.display = 'none';
+    document.getElementById('defense-round-label').textContent = 'ROUND 1';
+    const initHp = (msg.defense && msg.defense.maxHp) || 100;
+    document.getElementById('defense-hp-num').textContent = (msg.defense && msg.defense.teamHp) || initHp;
+    document.getElementById('defense-hp-fill').style.width = '100%';
+    document.getElementById('defense-timer').textContent = '01:00';
+    mpBuildDefenseBoards(playerList, false);
   } else {
     mpBuildOppSlots(mpRoomMode, playerList);
   }
   document.getElementById('mp-waiting-start-btn').disabled = true;
   document.getElementById('mp-waiting-ready-btn').disabled = true;
+  document.getElementById('defense-start-btn').disabled = true;
+  document.getElementById('defense-ready-btn').disabled = true;
 
   renderAll();
   document.removeEventListener('keydown', onKeyDown);
@@ -2153,6 +2373,7 @@ function renderAll(){
   document.getElementById('stat-score').textContent = eng.score;
   document.getElementById('stat-lines').textContent = eng.lines;
   document.getElementById('stat-level').textContent = eng.level;
+  mpRenderDefenseSelfBoard();
 }
 
 // ---------- 입력 (DAS/ARR) ----------
