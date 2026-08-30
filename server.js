@@ -579,17 +579,24 @@ function startBotSimulation(room){
 const DEFENSE_ROUND_MS = 60000;
 const DEFENSE_BOSS_MS = 180000;
 const DEFENSE_MONSTER_TYPES = ['zombie', 'wraith'];
-const DEFENSE_SPAWN_INTERVAL_MS = 2200;
 const DEFENSE_MONSTER_TRAVEL_MS = 14000;
-const DEFENSE_BOSS_HP = 40;
+const DEFENSE_BOSS_HP = 65;
 const DEFENSE_START_HP = 100;
+const DEFENSE_ROUND_GAP_MS = 5000;
 
+function defenseTargetSpawnCount(round, playerCount){
+  return Math.max(1, playerCount) * 3 * round;
+}
 function initDefenseState(room){
   const now = Date.now();
+  const playerCount = room.players.size;
   room.defense = {
     round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP,
     monsters: [], boss: null,
-    roundEndAt: now + DEFENSE_ROUND_MS, nextSpawnAt: now + 800,
+    roundEndAt: now + DEFENSE_ROUND_MS,
+    spawnInterval: DEFENSE_ROUND_MS / defenseTargetSpawnCount(1, playerCount),
+    nextSpawnAt: now + 500,
+    pendingRoundAt: null,
     gold: {}, ended: false,
   };
 }
@@ -599,6 +606,7 @@ function broadcastDefenseUpdate(room){
   broadcastAll(room, {
     type: 'defenseUpdate', round: d.round, teamHp: d.teamHp, maxHp: d.maxHp,
     roundRemainMs: Math.max(0, d.roundEndAt - now),
+    pending: !!(d.pendingRoundAt && now < d.pendingRoundAt),
     monsters: d.monsters.map(m => ({ id: m.id, type: m.type, progress: Math.min(1, (now - m.spawnAt) / m.travelMs) })),
     boss: d.boss ? { id: d.boss.id, progress: Math.min(1, (now - d.boss.spawnAt) / d.boss.travelMs), hp: d.boss.hp, maxHp: d.boss.maxHp } : null,
   });
@@ -606,17 +614,11 @@ function broadcastDefenseUpdate(room){
 function clearDefenseRound(room){
   const d = room.defense;
   for (const [id, p] of room.players) { if (!p.isBot) d.gold[id] = (d.gold[id] || 0) + 1; }
+  const clearedRound = d.round;
   d.round += 1;
   d.monsters = [];
-  const now = Date.now();
-  if (d.round === 5) {
-    d.boss = { id: uid(), spawnAt: now, travelMs: DEFENSE_BOSS_MS, hp: DEFENSE_BOSS_HP, maxHp: DEFENSE_BOSS_HP };
-    d.roundEndAt = now + DEFENSE_BOSS_MS;
-  } else {
-    d.roundEndAt = now + DEFENSE_ROUND_MS;
-    d.nextSpawnAt = now + 800;
-  }
-  broadcastAll(room, { type: 'defenseRoundClear', clearedRound: d.round - 1, nextRound: d.round });
+  d.pendingRoundAt = Date.now() + DEFENSE_ROUND_GAP_MS;
+  broadcastAll(room, { type: 'defenseRoundClear', clearedRound, nextRound: d.round });
 }
 function endDefenseGame(room, bossDefeated){
   const d = room.defense; if (!d || d.ended) return;
@@ -628,7 +630,8 @@ function endDefenseGame(room, bossDefeated){
   const ipCounts = {};
   for (const [, p] of room.players) { if (p.ip) ipCounts[p.ip] = (ipCounts[p.ip] || 0) + 1; }
   const noCoinIds = [...room.players.entries()].filter(([, p]) => p.ip && ipCounts[p.ip] >= 2).map(([id]) => id);
-  const results = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, gold: noCoinIds.includes(id) ? 0 : (d.gold[id] || 0), isBot: !!p.isBot }));
+  const botCount = [...room.players.values()].filter(p => p.isBot).length;
+  const results = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, gold: noCoinIds.includes(id) ? 0 : Math.max(0, (d.gold[id] || 0) - botCount), isBot: !!p.isBot }));
   broadcastAll(room, { type: 'defenseEnd', success: !!(bossDefeated && d.round === 5), roundReached: d.round, results });
   room.status = 'lobby';
   for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; p.bot = null; }
@@ -653,11 +656,24 @@ function startDefenseLoop(room){
     const d = room.defense;
     if (room.status !== 'playing' || !d || d.ended) { clearInterval(room.defenseInterval); return; }
     const now = Date.now();
+    if (d.pendingRoundAt) {
+      if (now < d.pendingRoundAt) { broadcastDefenseUpdate(room); return; }
+      d.pendingRoundAt = null;
+      const playerCount = room.players.size;
+      if (d.round === 5) {
+        d.boss = { id: uid(), spawnAt: now, travelMs: DEFENSE_BOSS_MS, hp: DEFENSE_BOSS_HP, maxHp: DEFENSE_BOSS_HP };
+        d.roundEndAt = now + DEFENSE_BOSS_MS;
+      } else {
+        d.roundEndAt = now + DEFENSE_ROUND_MS;
+        d.nextSpawnAt = now;
+        d.spawnInterval = DEFENSE_ROUND_MS / defenseTargetSpawnCount(d.round, playerCount);
+      }
+    }
     if (d.round !== 5) {
       if (now >= d.nextSpawnAt) {
         const type = DEFENSE_MONSTER_TYPES[Math.floor(Math.random() * DEFENSE_MONSTER_TYPES.length)];
         d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS });
-        d.nextSpawnAt = now + DEFENSE_SPAWN_INTERVAL_MS + Math.floor(Math.random() * 800);
+        d.nextSpawnAt = now + d.spawnInterval;
       }
       d.monsters = d.monsters.filter(m => {
         if ((now - m.spawnAt) / m.travelMs >= 1) { d.teamHp = Math.max(0, d.teamHp - 1); return false; }
