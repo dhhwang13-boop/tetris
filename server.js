@@ -162,7 +162,7 @@ function lobbyPayload(room) {
     players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready, isBot: !!p.isBot }))
   };
 }
-function modeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; return 5; }
+function modeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; return 5; }
 const TERRITORY_SIZE = 14;
 const FLAG_COLORS = ['#e24b4a', '#ff9c47', '#ffce45', '#52ff9d']; // 빨강/주황/노랑/초록
 const TERRITORY_CORNERS = [[0,0], [TERRITORY_SIZE-1,0], [0,TERRITORY_SIZE-1], [TERRITORY_SIZE-1,TERRITORY_SIZE-1]];
@@ -277,7 +277,7 @@ wss.on('connection', (ws, req) => {
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
       const title = String(msg.roomTitle || '').trim().slice(0, 20) || DEFAULT_ROOM_TITLES[Math.floor(Math.random() * DEFAULT_ROOM_TITLES.length)];
-      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : 'classic5');
+      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : (msg.mode === 'defense' ? 'defense' : 'classic5'));
       const room = { id, title, mode, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map(), spectators: new Map() };
       room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0, ip: ws.ip });
       rooms.set(id, room);
@@ -337,6 +337,11 @@ wss.on('connection', (ws, req) => {
           startBotSimulation(room);
           clearTimeout(room.territoryTimer);
           room.territoryTimer = setTimeout(() => endTerritoryMatch(room), 180000);
+        } else if (room.mode === 'defense') {
+          initDefenseState(room);
+          broadcastAll(room, { type: 'gameStart', players: playerList, mode: room.mode, defense: { round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP, roundRemainMs: DEFENSE_ROUND_MS } });
+          startBotSimulation(room);
+          startDefenseLoop(room);
         } else {
           broadcastAll(room, { type: 'gameStart', players: playerList, mode: room.mode });
         }
@@ -348,6 +353,12 @@ wss.on('connection', (ws, req) => {
       if (room.mode !== 'territory' || room.status !== 'playing') return;
       const amount = Math.max(0, Math.min(6, msg.amount || 0));
       if (amount > 0) { captureCells(room, ws.playerId, amount); broadcastTerritoryUpdate(room); }
+      return;
+    }
+
+    if (msg.type === 'defenseAttack') {
+      if (room.mode !== 'defense' || room.status !== 'playing') return;
+      applyDefenseDamage(room, Math.max(0, Math.min(4, msg.amount || 0)));
       return;
     }
 
@@ -546,7 +557,7 @@ function startBotSimulation(room){
       }
       const result = botPlaceBestPiece(bot);
       if (result.topOut) {
-        if (room.mode === 'territory') { bot.frozen = true; bot.frozenUntil = Date.now() + 5000; }
+        if (room.mode === 'territory' || room.mode === 'defense') { bot.frozen = true; bot.frozenUntil = Date.now() + 5000; }
         else { p.alive = false; checkEnd(room); }
       } else if (result.cleared > 0) {
         bot.combo = (bot.combo || 0) + 1;
@@ -555,7 +566,8 @@ function startBotSimulation(room){
         const captureAmount = Math.min(result.cleared, 6);
         p.score += result.cleared * 100;
         if (room.mode === 'territory' && captureAmount > 0) { captureCells(room, id, captureAmount); broadcastTerritoryUpdate(room); }
-        if (attackAmount > 0) applyPlayerAttack(room, id, p.name, attackAmount);
+        else if (room.mode === 'defense') { applyDefenseDamage(room, Math.min(result.cleared, 4)); }
+        else if (attackAmount > 0) { applyPlayerAttack(room, id, p.name, attackAmount); }
       } else {
         bot.combo = 0;
       }
@@ -563,6 +575,104 @@ function startBotSimulation(room){
     }
   }, BOT_TICK_MS);
 }
+// ---------- "침공저지" 협동 디펜스 모드 ----------
+const DEFENSE_ROUND_MS = 60000;
+const DEFENSE_BOSS_MS = 180000;
+const DEFENSE_MONSTER_TYPES = ['zombie', 'wraith'];
+const DEFENSE_SPAWN_INTERVAL_MS = 2200;
+const DEFENSE_MONSTER_TRAVEL_MS = 14000;
+const DEFENSE_BOSS_HP = 40;
+const DEFENSE_START_HP = 100;
+
+function initDefenseState(room){
+  const now = Date.now();
+  room.defense = {
+    round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP,
+    monsters: [], boss: null,
+    roundEndAt: now + DEFENSE_ROUND_MS, nextSpawnAt: now + 800,
+    gold: {}, ended: false,
+  };
+}
+function broadcastDefenseUpdate(room){
+  const d = room.defense; if (!d) return;
+  const now = Date.now();
+  broadcastAll(room, {
+    type: 'defenseUpdate', round: d.round, teamHp: d.teamHp, maxHp: d.maxHp,
+    roundRemainMs: Math.max(0, d.roundEndAt - now),
+    monsters: d.monsters.map(m => ({ id: m.id, type: m.type, progress: Math.min(1, (now - m.spawnAt) / m.travelMs) })),
+    boss: d.boss ? { id: d.boss.id, progress: Math.min(1, (now - d.boss.spawnAt) / d.boss.travelMs), hp: d.boss.hp, maxHp: d.boss.maxHp } : null,
+  });
+}
+function clearDefenseRound(room){
+  const d = room.defense;
+  for (const [id, p] of room.players) { if (!p.isBot) d.gold[id] = (d.gold[id] || 0) + 1; }
+  d.round += 1;
+  d.monsters = [];
+  const now = Date.now();
+  if (d.round === 5) {
+    d.boss = { id: uid(), spawnAt: now, travelMs: DEFENSE_BOSS_MS, hp: DEFENSE_BOSS_HP, maxHp: DEFENSE_BOSS_HP };
+    d.roundEndAt = now + DEFENSE_BOSS_MS;
+  } else {
+    d.roundEndAt = now + DEFENSE_ROUND_MS;
+    d.nextSpawnAt = now + 800;
+  }
+  broadcastAll(room, { type: 'defenseRoundClear', clearedRound: d.round - 1, nextRound: d.round });
+}
+function endDefenseGame(room, bossDefeated){
+  const d = room.defense; if (!d || d.ended) return;
+  d.ended = true;
+  clearInterval(room.defenseInterval);
+  if (d.round === 5 && bossDefeated) {
+    for (const [id, p] of room.players) { if (!p.isBot) d.gold[id] = (d.gold[id] || 0) + 2; }
+  }
+  const ipCounts = {};
+  for (const [, p] of room.players) { if (p.ip) ipCounts[p.ip] = (ipCounts[p.ip] || 0) + 1; }
+  const noCoinIds = [...room.players.entries()].filter(([, p]) => p.ip && ipCounts[p.ip] >= 2).map(([id]) => id);
+  const results = [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, gold: noCoinIds.includes(id) ? 0 : (d.gold[id] || 0), isBot: !!p.isBot }));
+  broadcastAll(room, { type: 'defenseEnd', success: !!(bossDefeated && d.round === 5), roundReached: d.round, results });
+  room.status = 'lobby';
+  for (const [id, p] of room.players) { p.ready = (id === room.hostId) || p.isBot; p.score = 0; p.lines = 0; p.alive = true; p.bot = null; }
+  broadcastAll(room, lobbyPayload(room));
+}
+function applyDefenseDamage(room, amount){
+  const d = room.defense; if (!d || d.ended || amount <= 0) return;
+  if (d.round === 5) {
+    if (!d.boss) return;
+    d.boss.hp -= amount;
+    if (d.boss.hp <= 0) { endDefenseGame(room, true); return; }
+  } else {
+    const now = Date.now();
+    d.monsters.sort((a, b) => ((now - b.spawnAt) / b.travelMs) - ((now - a.spawnAt) / a.travelMs));
+    d.monsters.splice(0, amount);
+  }
+  broadcastDefenseUpdate(room);
+}
+function startDefenseLoop(room){
+  clearInterval(room.defenseInterval);
+  room.defenseInterval = setInterval(() => {
+    const d = room.defense;
+    if (room.status !== 'playing' || !d || d.ended) { clearInterval(room.defenseInterval); return; }
+    const now = Date.now();
+    if (d.round !== 5) {
+      if (now >= d.nextSpawnAt) {
+        const type = DEFENSE_MONSTER_TYPES[Math.floor(Math.random() * DEFENSE_MONSTER_TYPES.length)];
+        d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS });
+        d.nextSpawnAt = now + DEFENSE_SPAWN_INTERVAL_MS + Math.floor(Math.random() * 800);
+      }
+      d.monsters = d.monsters.filter(m => {
+        if ((now - m.spawnAt) / m.travelMs >= 1) { d.teamHp = Math.max(0, d.teamHp - 1); return false; }
+        return true;
+      });
+      if (d.teamHp <= 0) { endDefenseGame(room, false); return; }
+      if (now >= d.roundEndAt) { clearDefenseRound(room); return; }
+    } else {
+      if (d.boss && (now - d.boss.spawnAt) / d.boss.travelMs >= 1) { endDefenseGame(room, false); return; }
+      if (d.teamHp <= 0) { endDefenseGame(room, false); return; }
+    }
+    broadcastDefenseUpdate(room);
+  }, 200);
+}
+
 function checkEnd(room) {
   if (room.status !== 'playing') return;
   const alivePlayers = [...room.players.entries()].filter(([, p]) => p.alive);
