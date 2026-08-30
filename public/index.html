@@ -314,9 +314,9 @@
   }
   .bot-remove-btn:hover{ background:var(--bad); color:#2a0000; }
   .territory-col{ display:flex; flex-direction:column; align-items:center; gap:10px; width:280px; }
-  .defense-col{ display:flex; flex-direction:column; align-items:center; gap:8px; width:280px; }
+  .defense-col{ display:flex; flex-direction:column; align-items:center; gap:8px; width:400px; }
   .defense-round-label{ font-size:13px; font-weight:900; color:var(--cyan); letter-spacing:1px; }
-  .defense-asset-wrap{ position:relative; width:280px; height:300px; border:1px solid var(--line); border-radius:8px; background:#0d1420; overflow:hidden; }
+  .defense-asset-wrap{ position:relative; width:400px; height:300px; border:1px solid var(--line); border-radius:8px; background:#0d1420; overflow:hidden; }
   .defense-timer{ position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:20px; font-weight:900; color:var(--yellow); z-index:4; }
   #defense-canvas{ position:absolute; top:0; left:0; }
   .defense-center-overlay{
@@ -329,7 +329,7 @@
   .defense-hp-max{ font-size:11px; color:var(--dim); }
   .defense-hp-track{ flex:1; height:14px; background:var(--bg2); border-radius:7px; overflow:hidden; border:1px solid var(--line); }
   .defense-hp-fill{ height:100%; background:linear-gradient(90deg,#ff5468,#ff8a4a); transition:width .3s; }
-  .defense-boards{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; width:100%; }
+  .defense-boards{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; width:100%; }
   .defense-boards .opp-slot{ min-height:auto; padding:4px; }
   .defense-boards .opp-name{ font-size:9px; }
   .territory-timer{ font-size:28px; font-weight:900; color:var(--yellow); letter-spacing:1px; }
@@ -692,8 +692,8 @@
         <div class="defense-round-label" id="defense-round-label">ROUND 1</div>
         <div class="defense-asset-wrap">
           <div class="defense-timer" id="defense-timer">01:00</div>
-          <canvas id="defense-canvas" width="280" height="300"></canvas>
-          <div class="defense-center-overlay">
+          <canvas id="defense-canvas" width="400" height="300"></canvas>
+          <div class="defense-center-overlay" id="defense-center-overlay">
             <button class="ov-btn main" id="defense-start-btn" style="display:none; width:150px;">게임 시작</button>
             <button class="ov-btn main" id="defense-ready-btn" style="display:none; width:150px;">게임 준비</button>
             <div class="defense-license">캐릭터 스프라이트: Liberated Pixel Cup (CC-BY-SA 3.0)</div>
@@ -1563,6 +1563,7 @@ function mpRenderLobby(msg){
     document.getElementById('territory-col').style.display = 'none';
     document.getElementById('mp-ready-box').style.display = 'none';
     document.getElementById('defense-col').style.display = 'flex';
+    document.getElementById('defense-center-overlay').style.display = 'flex';
     document.getElementById('defense-round-label').textContent = '대기중';
     document.getElementById('defense-timer').textContent = '--:--';
     document.getElementById('defense-hp-num').textContent = 100;
@@ -1789,9 +1790,10 @@ function mpBuildDefenseBoards(players, showControls){
   const grid = document.getElementById('defense-boards');
   grid.innerHTML = '';
   mpOthers = {};
-  const maxSlots = mpModeMax('defense');
-  for(let i=0;i<maxSlots;i++){
-    const p = players[i];
+  const others = players.filter(p=>p.id!==mpPlayerId);
+  const maxOtherSlots = mpModeMax('defense') - 1;
+  for(let i=0;i<maxOtherSlots;i++){
+    const p = others[i];
     const slot = document.createElement('div');
     if(!p){
       slot.className = 'opp-slot empty';
@@ -1803,14 +1805,12 @@ function mpBuildDefenseBoards(players, showControls){
       grid.appendChild(slot);
       continue;
     }
-    const isMe = p.id === mpPlayerId;
-    slot.className = 'opp-slot';
-    slot.id = isMe ? 'defense-self-slot' : 'opp-'+p.id;
-    if(!isMe) mpOthers[p.id] = { name:p.name, color:'#3ddbff', alive:true, score:0 };
-    const label = isMe ? (mpEscapeHtml(p.name)+' (나)') : (mpEscapeHtml(p.name)+(p.isBot?' 🤖':''));
+    slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
+    mpOthers[p.id] = { name:p.name, color:'#3ddbff', alive:true, score:0 };
+    const label = mpEscapeHtml(p.name)+(p.isBot?' 🤖':'');
     const removeBtn = (showControls && p.isBot && mpIsHost) ? `<div class="bot-remove-btn" title="봇 제거" data-bot-id="${p.id}">−</div>` : '';
-    slot.innerHTML = `<div class="opp-name"><span>${label}</span><span class="opp-score" id="${isMe?'defense-self-score':'opp-score-'+p.id}">0</span></div>
-      <canvas id="${isMe?'defense-self-board':'opp-board-'+p.id}" width="80" height="160"></canvas>${removeBtn}`;
+    slot.innerHTML = `<div class="opp-name"><span>${label}</span><span class="opp-score" id="opp-score-${p.id}">0</span></div>
+      <canvas id="opp-board-${p.id}" width="80" height="160"></canvas>${removeBtn}`;
     if(removeBtn){
       slot.querySelector('.bot-remove-btn').addEventListener('click', (e)=>{ e.stopPropagation(); mpSend({type:'removeBot', botId:p.id}); });
     }
@@ -1826,8 +1826,8 @@ function mpRenderDefenseSelfBoard(){
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ if(eng.board[r][c]){ ctx.fillStyle = '#3ddbff'; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
   const scoreEl = document.getElementById('defense-self-score'); if(scoreEl) scoreEl.textContent = eng.score;
 }
-const monsterWalkImg = new Image(); monsterWalkImg.src = 'assets/monster-walk.png';
 const bossImg = new Image(); bossImg.src = 'assets/boss.png';
+const monsterWalkImg = new Image(); monsterWalkImg.src = 'assets/monster-walk.png';
 const MONSTER_FRAME_SIZE = 64, MONSTER_FRAME_COUNT = 9;
 const monsterTintCanvas = document.createElement('canvas');
 monsterTintCanvas.width = MONSTER_FRAME_SIZE; monsterTintCanvas.height = MONSTER_FRAME_SIZE;
@@ -1856,13 +1856,54 @@ function drawDefenseMonster(ctx, x, y, type, scale){
     ctx.fillStyle = bodyColor; ctx.beginPath(); ctx.arc(x,y,size/2,0,Math.PI*2); ctx.fill();
   }
 }
+let defenseBgCache = null;
+function drawDefenseBackground(ctx, w, h){
+  if(!defenseBgCache || defenseBgCache.width!==w || defenseBgCache.height!==h){
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    const bctx = c.getContext('2d');
+    let seed = 42;
+    function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
+    bctx.fillStyle = '#3d2c1f'; bctx.fillRect(0,0,w,h);
+    for(let i=0;i<60;i++){
+      const x = rnd()*w, y = rnd()*h;
+      bctx.fillStyle = rnd()<0.5 ? 'rgba(70,50,32,0.5)' : 'rgba(28,18,10,0.45)';
+      bctx.beginPath(); bctx.ellipse(x,y, 10+rnd()*16, 6+rnd()*10, rnd()*Math.PI, 0, Math.PI*2); bctx.fill();
+    }
+    for(let i=0;i<34;i++){
+      let x,y;
+      if(rnd()<0.5){ x = rnd()*w; y = rnd()<0.5 ? rnd()*22 : h-rnd()*22; }
+      else { x = rnd()<0.5 ? rnd()*22 : w-rnd()*22; y = rnd()*h; }
+      bctx.strokeStyle = '#4a7a3a'; bctx.lineWidth = 2;
+      for(let k=0;k<4;k++){
+        bctx.beginPath();
+        bctx.moveTo(x+k*3-4, y+5);
+        bctx.lineTo(x+k*3-4+(rnd()*4-2), y-5-rnd()*5);
+        bctx.stroke();
+      }
+    }
+    for(let i=0;i<10;i++){
+      const x = rnd()*w, y = rnd()*h;
+      bctx.fillStyle = '#5c5c5c';
+      bctx.beginPath(); bctx.ellipse(x,y,5+rnd()*4,3+rnd()*3,0,0,Math.PI*2); bctx.fill();
+      bctx.fillStyle = '#7a7a7a';
+      bctx.beginPath(); bctx.ellipse(x-1,y-1,2,1.4,0,0,Math.PI*2); bctx.fill();
+    }
+    for(let i=0;i<4;i++){
+      const x = rnd()*(w-50)+25, y = rnd()*(h-30)+15;
+      bctx.save(); bctx.translate(x,y); bctx.rotate(rnd()*Math.PI);
+      bctx.fillStyle = '#3a2818'; bctx.fillRect(-18,-3,36,6);
+      bctx.fillStyle = '#241408'; bctx.fillRect(-18,-3,4,6); bctx.fillRect(14,-3,4,6);
+      bctx.restore();
+    }
+    defenseBgCache = c;
+  }
+  ctx.drawImage(defenseBgCache, 0, 0);
+}
 function mpRenderDefenseMonsters(msg){
   const canvas = document.getElementById('defense-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#0d1420'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-  for(let i=0;i<canvas.width;i+=20){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+  drawDefenseBackground(ctx, canvas.width, canvas.height);
   const laneCount = 5;
   (msg.monsters||[]).forEach((m,idx)=>{
     const lane = idx % laneCount;
@@ -1880,12 +1921,17 @@ function mpRenderDefenseMonsters(msg){
 }
 function mpApplyDefenseUpdate(msg){
   const label = document.getElementById('defense-round-label');
-  if(label) label.textContent = 'ROUND ' + msg.round + (msg.round===5 ? ' (보스)' : '');
+  if(label) label.textContent = msg.pending ? `잠시 후 ROUND ${msg.round} 시작...` : ('ROUND ' + msg.round + (msg.round===5 ? ' (보스)' : ''));
   const hpNum = document.getElementById('defense-hp-num'); if(hpNum) hpNum.textContent = msg.teamHp;
   const hpFill = document.getElementById('defense-hp-fill'); if(hpFill) hpFill.style.width = Math.max(0, msg.teamHp/msg.maxHp*100)+'%';
-  const remain = Math.max(0, Math.ceil(msg.roundRemainMs/1000));
-  const m = Math.floor(remain/60), s = remain%60;
-  const timerEl = document.getElementById('defense-timer'); if(timerEl) timerEl.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  const timerEl = document.getElementById('defense-timer');
+  if(msg.pending){
+    if(timerEl) timerEl.textContent = '대기중';
+  } else {
+    const remain = Math.max(0, Math.ceil(msg.roundRemainMs/1000));
+    const m = Math.floor(remain/60), s = remain%60;
+    if(timerEl) timerEl.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  }
   mpRenderDefenseMonsters(msg);
 }
 function mpShowDefenseRoundClear(msg){
@@ -1966,8 +2012,7 @@ function startMultiplayerGame(msg){
     });
   } else if(mpRoomMode === 'defense'){
     document.getElementById('defense-col').style.display = 'flex';
-    document.getElementById('defense-start-btn').style.display = 'none';
-    document.getElementById('defense-ready-btn').style.display = 'none';
+    document.getElementById('defense-center-overlay').style.display = 'none';
     document.getElementById('defense-round-label').textContent = 'ROUND 1';
     const initHp = (msg.defense && msg.defense.maxHp) || 100;
     document.getElementById('defense-hp-num').textContent = (msg.defense && msg.defense.teamHp) || initHp;
