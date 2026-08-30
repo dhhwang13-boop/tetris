@@ -1635,10 +1635,11 @@ function mpApplyOpponentState(msg){
     const rows = msg.boardFlat.split('|');
     for(let r=0;r<rows.length;r++) for(let c=0;c<COLS;c++){ if(rows[r][c]==='1'){ ctx.fillStyle = info.color; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
   } else {
-    const slot = document.getElementById('opp-'+msg.id); if(!slot) return;
+    const prefix = (mpRoomMode === 'territory') ? 'topp-' : 'opp-';
+    const slot = document.getElementById(prefix+msg.id); if(!slot) return;
     slot.classList.toggle('dead', !info.alive);
-    const scoreEl = document.getElementById('opp-score-'+msg.id); if(scoreEl) scoreEl.textContent = info.score;
-    const canvas = document.getElementById('opp-board-'+msg.id); if(!canvas) return;
+    const scoreEl = document.getElementById(prefix+'score-'+msg.id); if(scoreEl) scoreEl.textContent = info.score;
+    const canvas = document.getElementById(prefix+'board-'+msg.id); if(!canvas) return;
     const ctx = canvas.getContext('2d'); const cell = canvas.width / COLS;
     ctx.fillStyle = '#05060c'; ctx.fillRect(0,0,COLS*cell,ROWS*cell);
     const rows = msg.boardFlat.split('|');
@@ -1740,9 +1741,9 @@ function startMultiplayerGame(msg){
     territoryOppGrid.innerHTML = '';
     playerList.filter(p=>p.id!==mpPlayerId).forEach(p=>{
       const slot = document.createElement('div');
-      slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
-      slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.isBot?' 🤖':''}</span><span class="opp-score" id="opp-score-${p.id}">0</span></div>
-        <canvas id="opp-board-${p.id}" width="80" height="160"></canvas>`;
+      slot.className = 'opp-slot'; slot.id = 'topp-'+p.id;
+      slot.innerHTML = `<div class="opp-name"><span>${mpEscapeHtml(p.name)}${p.isBot?' 🤖':''}</span><span class="opp-score" id="topp-score-${p.id}">0</span></div>
+        <canvas id="topp-board-${p.id}" width="80" height="160"></canvas>`;
       territoryOppGrid.appendChild(slot);
     });
   } else {
