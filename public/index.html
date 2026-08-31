@@ -324,11 +324,10 @@
     display:flex; flex-direction:column; align-items:center; gap:8px;
   }
   .defense-license{ font-size:9px; color:var(--dim); text-align:center; white-space:nowrap; opacity:.35; }
-  .defense-hp-row{ display:flex; align-items:center; gap:6px; width:100%; }
-  .defense-hp-num{ font-size:14px; font-weight:900; color:var(--bad); width:28px; text-align:right; }
-  .defense-hp-max{ font-size:11px; color:var(--dim); }
-  .defense-hp-track{ flex:1; height:14px; background:var(--bg2); border-radius:7px; overflow:hidden; border:1px solid var(--line); }
+  .defense-hp-row{ display:flex; align-items:center; width:100%; }
+  .defense-hp-track{ position:relative; flex:1; height:18px; background:var(--bg2); border-radius:9px; overflow:hidden; border:1px solid var(--line); }
   .defense-hp-fill{ height:100%; background:linear-gradient(90deg,#ff5468,#ff8a4a); transition:width .3s; }
+  .defense-hp-label{ position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.7); }
   .defense-boards{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; width:100%; }
   .defense-boards .opp-slot{ min-height:190px; padding:4px; }
   .defense-boards .opp-name{ font-size:9px; }
@@ -700,9 +699,10 @@
           </div>
         </div>
         <div class="defense-hp-row">
-          <span class="defense-hp-num" id="defense-hp-num">100</span>
-          <div class="defense-hp-track"><div class="defense-hp-fill" id="defense-hp-fill"></div></div>
-          <span class="defense-hp-max">/100</span>
+          <div class="defense-hp-track">
+            <div class="defense-hp-fill" id="defense-hp-fill"></div>
+            <div class="defense-hp-label" id="defense-hp-label">100/100</div>
+          </div>
         </div>
         <div class="defense-boards" id="defense-boards"></div>
       </div>
@@ -1566,7 +1566,7 @@ function mpRenderLobby(msg){
     document.getElementById('defense-center-overlay').style.display = 'flex';
     document.getElementById('defense-round-label').textContent = '';
     document.getElementById('defense-timer').textContent = '--:--';
-    document.getElementById('defense-hp-num').textContent = 100;
+    document.getElementById('defense-hp-label').textContent = '100/100';
     document.getElementById('defense-hp-fill').style.width = '100%';
     mpBuildDefenseBoards(msg.players, true);
     mpClearReadyChecks();
@@ -1965,7 +1965,7 @@ function mpRenderDefenseMonsters(msg){
 function mpApplyDefenseUpdate(msg){
   const label = document.getElementById('defense-round-label');
   if(label) label.textContent = msg.pending ? `잠시 후 ROUND ${msg.round} 시작...` : ('ROUND ' + msg.round + (msg.round===5 ? ' (보스)' : ''));
-  const hpNum = document.getElementById('defense-hp-num'); if(hpNum) hpNum.textContent = msg.teamHp;
+  const hpLabel = document.getElementById('defense-hp-label'); if(hpLabel) hpLabel.textContent = msg.teamHp+'/'+msg.maxHp;
   const hpFill = document.getElementById('defense-hp-fill'); if(hpFill) hpFill.style.width = Math.max(0, msg.teamHp/msg.maxHp*100)+'%';
   const timerEl = document.getElementById('defense-timer');
   if(msg.pending){
@@ -2058,7 +2058,8 @@ function startMultiplayerGame(msg){
     document.getElementById('defense-center-overlay').style.display = 'none';
     document.getElementById('defense-round-label').textContent = 'ROUND 1';
     const initHp = (msg.defense && msg.defense.maxHp) || 100;
-    document.getElementById('defense-hp-num').textContent = (msg.defense && msg.defense.teamHp) || initHp;
+    const initTeamHp = (msg.defense && msg.defense.teamHp) || initHp;
+    document.getElementById('defense-hp-label').textContent = initTeamHp+'/'+initHp;
     document.getElementById('defense-hp-fill').style.width = '100%';
     document.getElementById('defense-timer').textContent = '01:00';
     mpBuildDefenseBoards(playerList, false);
