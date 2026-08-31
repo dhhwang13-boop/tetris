@@ -30,6 +30,21 @@
     user-select:none;
   }
   .screen{ display:none; height:100vh; }
+  .rest-wrap{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .5s; background:#0a0e14; }
+  .rest-wrap.fading{ opacity:0; }
+  #rest-canvas{ border:1px solid var(--line); border-radius:8px; background:#3a6b34; }
+  .rest-chat-log{
+    position:absolute; left:20px; bottom:56px; width:320px; max-height:160px; overflow-y:auto;
+    background:rgba(10,14,20,0.7); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .rest-chat-input-row{ position:absolute; left:20px; bottom:16px; width:320px; }
+  .rest-chat-input-row input{
+    width:100%; background:var(--bg); border:1px solid var(--cyan); color:var(--text); padding:8px 10px;
+    border-radius:6px; font-family:inherit; font-size:13px; outline:none;
+  }
+  .rest-hint{ position:absolute; right:20px; bottom:16px; font-size:11px; color:var(--dim); background:rgba(10,14,20,0.6); padding:6px 10px; border-radius:6px; }
+  .rest-name-tag{ position:absolute; pointer-events:none; font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.8); }
   .screen.active{ display:flex; }
 
   /* ---------- 메인 메뉴 ---------- */
@@ -515,6 +530,7 @@
       <option value="classic5">클래식 (5인)</option>
       <option value="territory">땅따먹기 (4인)</option>
       <option value="defense">침공저지 (4인 협동)</option>
+      <option value="rest">휴식의 땅 (4인)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -707,6 +723,18 @@
         <div class="defense-boards" id="defense-boards"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ================= 휴식의 땅 (자유 이동 + 채팅 공간) ================= -->
+<div class="screen" id="screen-rest">
+  <div class="rest-wrap" id="rest-wrap">
+    <canvas id="rest-canvas" width="900" height="560"></canvas>
+    <div class="rest-chat-log" id="rest-chat-log"></div>
+    <div class="rest-chat-input-row" id="rest-chat-input-row" style="display:none;">
+      <input type="text" id="rest-chat-input" maxlength="120" placeholder="메시지를 입력하고 Enter...">
+    </div>
+    <div class="rest-hint">WASD 이동 · Shift 달리기 · Enter 채팅 · Esc 나가기</div>
   </div>
 </div>
 
@@ -1228,12 +1256,12 @@ function mpHandleMessage(msg){
   switch(msg.type){
     case 'created':
       mpRoomId = msg.roomId; mpPlayerId = msg.playerId; mpIsHost = true;
-      mpEnterWaitingRoom();
+      if(msg.mode === 'rest') mpEnterRestMode(); else mpEnterWaitingRoom();
       break;
     case 'joined':
       mpRoomId = msg.roomId; mpPlayerId = msg.playerId; mpIsHost = false;
       document.getElementById('mp-pw-modal').style.display = 'none';
-      mpEnterWaitingRoom();
+      if(msg.mode === 'rest') mpEnterRestMode(); else mpEnterWaitingRoom();
       break;
     case 'error':
       if(document.getElementById('mp-pw-modal').style.display === 'flex'){
@@ -1258,10 +1286,20 @@ function mpHandleMessage(msg){
     case 'defenseRoundClear': mpShowDefenseRoundClear(msg); break;
     case 'defenseEnd': mpEndDefenseGame(msg); break;
     case 'roomClosed': mpHandleRoomClosed(msg.reason); break;
+    case 'restPlayerUpdate':
+      if(!mpOthers[msg.id]) mpOthers[msg.id] = { name:msg.name, color: PLAYER_COLORS[Object.keys(mpOthers).length % PLAYER_COLORS.length], alive:true, score:0 };
+      mpRestOthers[msg.id] = { name:msg.name, x:msg.x, y:msg.y, facing:msg.facing, moving:msg.moving, running:msg.running, lastSeen:Date.now() };
+      break;
+    case 'restPlayerLeft': delete mpRestOthers[msg.id]; break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
     case 'chat':
-      { const info = mpOthers[msg.id]; appendChatLine(msg.name, msg.text, info ? info.color : null); }
-      if(msg.isEmoji) mpShowSpeechBubble(msg.id, msg.text);
+      if(mpRoomMode === 'rest'){
+        const info = mpOthers[msg.id];
+        appendRestChatLine(msg.name, msg.text, info ? info.color : null);
+      } else {
+        const info = mpOthers[msg.id]; appendChatLine(msg.name, msg.text, info ? info.color : null);
+        if(msg.isEmoji) mpShowSpeechBubble(msg.id, msg.text);
+      }
       break;
     case 'end': mpEndGame(msg.ranking, msg.mode, msg.noCoins, msg.noCoinIds); break;
   }
@@ -1327,10 +1365,11 @@ function mpRefreshRoomList(){
 }
 document.getElementById('mp-refresh').addEventListener('click', mpRefreshRoomList);
 
-function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; return 5; }
+function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; if(mode === 'rest') return 4; return 5; }
 function mpModeLabel(mode){
   if(mode === 'territory') return '땅따먹기';
   if(mode === 'defense') return '침공저지';
+  if(mode === 'rest') return '휴식의 땅';
   if(mode === 'classic2') return '클래식(2인)';
   return '클래식(5인)';
 }
@@ -1423,6 +1462,204 @@ function mpShowWaitingVisuals(){
   document.getElementById('stat-lines').textContent = 0;
   document.getElementById('stat-level').textContent = 1;
 }
+// ---------- 휴식의 땅 (자유 이동 + 채팅) ----------
+let mpRestOthers = {};
+let mpRestMe = { x: 450, y: 280, facing: 'down', moving: false, running: false };
+let mpRestKeys = { w:false, a:false, s:false, d:false, shift:false };
+let mpRestLoopId = null;
+let mpRestSendTimer = null;
+let mpRestBgCache = null;
+const REST_MAP_W = 900, REST_MAP_H = 560;
+const REST_CHAR_SIZE = 68; // 침공저지 몬스터(34) 대비 2배
+const REST_WALK_SPEED = 1.6, REST_RUN_SPEED = 3.0;
+
+function mpEnterRestMode(){
+  mpActive = true; mpRoomMode = 'rest'; mpMatchStarted = true;
+  mpRestOthers = {};
+  mpRestMe = { x: REST_MAP_W/2, y: REST_MAP_H/2, facing: 'down', moving: false, running: false };
+  document.getElementById('rest-chat-log').innerHTML = '';
+  document.getElementById('rest-chat-input-row').style.display = 'none';
+  const wrap = document.getElementById('rest-wrap');
+  wrap.classList.add('fading');
+  showScreen('screen-rest');
+  setTimeout(()=>{
+    wrap.classList.remove('fading');
+  }, 60);
+  document.removeEventListener('keydown', mpRestKeyDown);
+  document.removeEventListener('keyup', mpRestKeyUp);
+  document.addEventListener('keydown', mpRestKeyDown);
+  document.addEventListener('keyup', mpRestKeyUp);
+  cancelAnimationFrame(mpRestLoopId);
+  mpRestLoopId = requestAnimationFrame(mpRestLoop);
+  clearInterval(mpRestSendTimer);
+  mpRestSendTimer = setInterval(mpRestSendPosition, 120);
+}
+function mpRestExit(){
+  cancelAnimationFrame(mpRestLoopId);
+  clearInterval(mpRestSendTimer);
+  document.removeEventListener('keydown', mpRestKeyDown);
+  document.removeEventListener('keyup', mpRestKeyUp);
+  mpDisconnect();
+  showScreen('screen-menu');
+}
+function mpRestKeyDown(e){
+  if(e.key === 'Escape'){ mpRestExit(); return; }
+  if(e.key === 'Enter'){
+    const row = document.getElementById('rest-chat-input-row');
+    const input = document.getElementById('rest-chat-input');
+    if(row.style.display === 'none'){
+      row.style.display = 'block'; input.value=''; input.focus();
+    } else if(input.value.trim()){
+      mpSendChat(input.value.trim(), false);
+      input.value=''; row.style.display='none';
+    } else {
+      row.style.display='none';
+    }
+    return;
+  }
+  if(document.getElementById('rest-chat-input-row').style.display !== 'none') return; // 채팅 중엔 이동 무시
+  if(e.key==='w'||e.key==='W') mpRestKeys.w = true;
+  if(e.key==='a'||e.key==='A') mpRestKeys.a = true;
+  if(e.key==='s'||e.key==='S') mpRestKeys.s = true;
+  if(e.key==='d'||e.key==='D') mpRestKeys.d = true;
+  if(e.key==='Shift') mpRestKeys.shift = true;
+}
+function mpRestKeyUp(e){
+  if(e.key==='w'||e.key==='W') mpRestKeys.w = false;
+  if(e.key==='a'||e.key==='A') mpRestKeys.a = false;
+  if(e.key==='s'||e.key==='S') mpRestKeys.s = false;
+  if(e.key==='d'||e.key==='D') mpRestKeys.d = false;
+  if(e.key==='Shift') mpRestKeys.shift = false;
+}
+function mpRestSendPosition(){
+  if(!mpActive || mpRoomMode!=='rest') return;
+  mpSend({type:'restMove', x:mpRestMe.x, y:mpRestMe.y, facing:mpRestMe.facing, moving:mpRestMe.moving, running:mpRestMe.running});
+}
+function mpRestLoop(){
+  if(!mpActive || mpRoomMode!=='rest'){ return; }
+  const chatOpen = document.getElementById('rest-chat-input-row').style.display !== 'none';
+  let dx=0, dy=0;
+  if(!chatOpen){
+    if(mpRestKeys.w) dy -= 1;
+    if(mpRestKeys.s) dy += 1;
+    if(mpRestKeys.a) dx -= 1;
+    if(mpRestKeys.d) dx += 1;
+  }
+  const moving = (dx!==0 || dy!==0);
+  mpRestMe.moving = moving;
+  mpRestMe.running = moving && mpRestKeys.shift;
+  if(moving){
+    const len = Math.sqrt(dx*dx+dy*dy);
+    const speed = mpRestMe.running ? REST_RUN_SPEED : REST_WALK_SPEED;
+    mpRestMe.x = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_W-REST_CHAR_SIZE/2, mpRestMe.x + (dx/len)*speed));
+    mpRestMe.y = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_H-REST_CHAR_SIZE/2, mpRestMe.y + (dy/len)*speed));
+    if(dy<0) mpRestMe.facing = 'up'; else if(dy>0) mpRestMe.facing = 'down';
+    else if(dx<0) mpRestMe.facing = 'left'; else if(dx>0) mpRestMe.facing = 'right';
+  }
+  mpRestRender();
+  mpRestLoopId = requestAnimationFrame(mpRestLoop);
+}
+function mpRestBuildBackground(){
+  const c = document.createElement('canvas'); c.width = REST_MAP_W; c.height = REST_MAP_H;
+  const ctx = c.getContext('2d');
+  let seed = 7;
+  function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
+  ctx.fillStyle = '#3a6b34'; ctx.fillRect(0,0,REST_MAP_W,REST_MAP_H);
+  // 강
+  ctx.fillStyle = '#3d78b8';
+  ctx.beginPath();
+  ctx.moveTo(0,80); ctx.quadraticCurveTo(200,140,180,260); ctx.quadraticCurveTo(160,380,320,420);
+  ctx.lineTo(320,470); ctx.quadraticCurveTo(140,430,120,280); ctx.quadraticCurveTo(140,150,0,130); ctx.closePath(); ctx.fill();
+  // 밭
+  ctx.fillStyle = '#8a6a3a';
+  for(let r=0;r<3;r++) for(let col=0;col<4;col++){
+    ctx.fillRect(560+col*36, 60+r*30, 30, 24);
+  }
+  ctx.fillStyle = '#6a9a3a';
+  for(let r=0;r<3;r++) for(let col=0;col<4;col++){
+    ctx.fillRect(560+col*36, 60+r*30, 30, 6);
+  }
+  // 길
+  ctx.fillStyle = '#c9b183';
+  ctx.fillRect(420,0,60,REST_MAP_H);
+  ctx.fillRect(0,300,REST_MAP_W,50);
+  // 건물
+  function building(x,y,w,h,color){
+    ctx.fillStyle = color; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle = '#5a3a25'; ctx.fillRect(x-6,y-18,w+12,20);
+    ctx.fillStyle = '#3a2818'; ctx.fillRect(x+w/2-6,y+h-24,16,24);
+  }
+  building(560,340,90,70,'#c96a4a');
+  building(700,360,80,60,'#b9a26a');
+  building(140,60,80,60,'#8a9ac9');
+  // 수풀
+  for(let i=0;i<24;i++){
+    const x = rnd()*REST_MAP_W, y = rnd()*REST_MAP_H;
+    ctx.fillStyle = '#4a8a3a';
+    ctx.beginPath(); ctx.ellipse(x,y,10+rnd()*6,7+rnd()*4,0,0,Math.PI*2); ctx.fill();
+  }
+  // 나무
+  function tree(x,y){
+    ctx.fillStyle = '#5a3a20'; ctx.fillRect(x-3,y,6,20);
+    ctx.fillStyle = '#3d7a30'; ctx.beginPath(); ctx.arc(x,y-8,16,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#4a9a3a'; ctx.beginPath(); ctx.arc(x-6,y-14,10,0,Math.PI*2); ctx.fill();
+  }
+  const treeSpots = [[60,150],[80,420],[380,480],[500,480],[820,120],[850,260],[780,480],[260,60],[40,60]];
+  treeSpots.forEach(([x,y])=>tree(x,y));
+  return c;
+}
+const REST_CHAR_FRAME_SIZE = 64;
+const restCharTintCanvas = document.createElement('canvas');
+restCharTintCanvas.width = REST_CHAR_FRAME_SIZE; restCharTintCanvas.height = REST_CHAR_FRAME_SIZE;
+const restCharTintCtx = restCharTintCanvas.getContext('2d');
+function drawRestCharacter(ctx, x, y, name, color, moving, running, facing){
+  const size = REST_CHAR_SIZE;
+  if(monsterWalkImg.complete && monsterWalkImg.naturalWidth>0){
+    const speed = running ? 70 : 120;
+    const frame = moving ? Math.floor(Date.now()/speed) % MONSTER_FRAME_COUNT : 0;
+    restCharTintCtx.clearRect(0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
+    restCharTintCtx.drawImage(monsterWalkImg, frame*REST_CHAR_FRAME_SIZE, 0, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, 0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
+    restCharTintCtx.globalCompositeOperation = 'source-atop';
+    restCharTintCtx.fillStyle = color;
+    restCharTintCtx.fillRect(0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
+    restCharTintCtx.globalCompositeOperation = 'source-over';
+    ctx.save();
+    if(facing==='left'){ ctx.translate(x+size/2,y-size/2); ctx.scale(-1,1); ctx.drawImage(restCharTintCanvas, 0,0,size,size); }
+    else { ctx.drawImage(restCharTintCanvas, x-size/2, y-size, size, size); }
+    ctx.restore();
+  } else {
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x,y-size/2,size/2,0,Math.PI*2); ctx.fill();
+  }
+  ctx.fillStyle = '#fff';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+  ctx.fillText(name, x, y-size-6);
+  ctx.shadowBlur = 0;
+}
+function mpRestRender(){
+  const canvas = document.getElementById('rest-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if(!mpRestBgCache) mpRestBgCache = mpRestBuildBackground();
+  ctx.drawImage(mpRestBgCache, 0, 0);
+  const now = Date.now();
+  for(const id in mpRestOthers){
+    const o = mpRestOthers[id];
+    if(now - o.lastSeen > 8000) continue; // 오래 소식없으면 표시 제외
+    const info = mpOthers[id];
+    drawRestCharacter(ctx, o.x, o.y, o.name, (info&&info.color)||'#3ddbff', o.moving, o.running, o.facing);
+  }
+  drawRestCharacter(ctx, mpRestMe.x, mpRestMe.y, (getNickname()||'나')+' (나)', '#3ddbff', mpRestMe.moving, mpRestMe.running, mpRestMe.facing);
+}
+function appendRestChatLine(name, text, color){
+  const log = document.getElementById('rest-chat-log');
+  const line = document.createElement('div');
+  line.innerHTML = `<b style="color:${color||'var(--cyan)'}">${mpEscapeHtml(name)}:</b> ${mpEscapeHtml(text)}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
 function mpEnterWaitingRoom(){
   mpIsSpectator = false;
   mpActive = true; mpMatchStarted = false; gameOverHandled = false; mpMyReady = false;
@@ -1806,7 +2043,7 @@ function mpBuildDefenseBoards(players, showControls){
       continue;
     }
     slot.className = 'opp-slot'; slot.id = 'opp-'+p.id;
-    mpOthers[p.id] = { name:p.name, color:'#3ddbff', alive:true, score:0 };
+    mpOthers[p.id] = { name:p.name, color: PLAYER_COLORS[i%PLAYER_COLORS.length], alive:true, score:0 };
     const label = mpEscapeHtml(p.name)+(p.isBot?' 🤖':'');
     const removeBtn = (showControls && p.isBot && mpIsHost) ? `<div class="bot-remove-btn" title="봇 제거" data-bot-id="${p.id}">−</div>` : '';
     slot.innerHTML = `<div class="opp-name"><span>${label}</span><span class="opp-score" id="opp-score-${p.id}">0</span></div>
@@ -1933,7 +2170,7 @@ function mpRenderDefenseMonsters(msg){
     const prev = mpDefensePrevMonsters[m.id];
     const justHit = !!(prev && m.hp!=null && prev.hp!=null && m.hp < prev.hp);
     drawDefenseMonster(ctx, x, y, m.type, 1, justHit);
-    if(m.maxHp>0) drawMonsterHpBar(ctx, x, y-24, m.hp, m.maxHp);
+    if(m.maxHp>0) drawMonsterHpBar(ctx, x, y-14, m.hp, m.maxHp);
     nowIds[m.id] = { type:m.type, x, y, hp:m.hp };
   });
   // 사라진(처치된) 몬스터는 마지막 위치에서 서서히 페이드아웃
@@ -2187,7 +2424,8 @@ function appendChatLine(name, text, color){
 }
 function mpSendChat(text, isEmoji){
   if(!text) return;
-  appendChatLine('나', text, 'var(--cyan)');
+  if(mpRoomMode === 'rest'){ appendRestChatLine('나', text, '#3ddbff'); }
+  else { appendChatLine('나', text, 'var(--cyan)'); }
   mpSend({type:'chat', text, isEmoji: !!isEmoji});
 }
 function mpFindOppAnchor(id){
