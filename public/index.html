@@ -800,12 +800,13 @@
       <div class="rest-inv-title">인벤토리</div>
       <div class="rest-inv-equip-area">
         <div class="rest-equip-slots-side">
-          <div class="rest-equip-slot" data-slot="head" id="rest-slot-head"><span class="rest-slot-label">head</span></div>
-          <div class="rest-equip-slot" data-slot="top" id="rest-slot-top"><span class="rest-slot-label">top</span></div>
+          <div class="rest-equip-slot" data-slot="head" id="rest-slot-head"><span class="rest-slot-label">머리</span></div>
+          <div class="rest-equip-slot" data-slot="top" id="rest-slot-top"><span class="rest-slot-label">상의</span></div>
         </div>
         <canvas id="rest-inv-preview" width="80" height="110"></canvas>
         <div class="rest-equip-slots-side">
-          <div class="rest-equip-slot" data-slot="bottom" id="rest-slot-bottom"><span class="rest-slot-label">bottom</span></div>
+          <div class="rest-equip-slot" data-slot="bottom" id="rest-slot-bottom"><span class="rest-slot-label">하의</span></div>
+          <div class="rest-equip-slot" data-slot="shoes" id="rest-slot-shoes"><span class="rest-slot-label">신발</span></div>
         </div>
       </div>
       <div class="rest-inv-divider"></div>
@@ -841,6 +842,14 @@
           <div class="rest-cs-swatch" id="rest-cs-swatch-shoes" data-target="shoes">색상 선택</div>
         </div>
         <button class="rest-cs-start-btn" id="rest-cs-start-btn">시작하기</button>
+      </div>
+    </div>
+
+    <div class="rest-charsetup" id="rest-esc-menu" style="display:none;">
+      <div class="rest-cs-box">
+        <div class="rest-cs-title">메뉴</div>
+        <button class="rest-cs-start-btn" id="rest-esc-resume-btn">계속하기</button>
+        <button class="rest-cs-start-btn" id="rest-esc-leave-btn" style="background:var(--bad); color:#fff; margin-top:8px;">메인으로 돌아가기</button>
       </div>
     </div>
   </div>
@@ -1400,11 +1409,17 @@ function mpHandleMessage(msg){
         cfg: { gender: msg.gender||'man', shirtColor: msg.shirtColor||'#4a9adf', pantsColor: msg.pantsColor||'#5a4a3a', shoesColor: msg.shoesColor||'#3a2a1a' } };
       break;
     case 'restPlayerLeft': delete mpRestOthers[msg.id]; break;
+    case 'restStarSpawn': mpRestStars[msg.id] = { x:msg.x, y:msg.y }; break;
+    case 'restStarCollected':
+      { const star = mpRestStars[msg.id]; delete mpRestStars[msg.id];
+        if(msg.collectorId === mpPlayerId){ addCoins(5); mpRestShowStarPopup(star); } }
+      break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
     case 'chat':
       if(mpRoomMode === 'rest'){
         const info = mpOthers[msg.id];
         appendRestChatLine(msg.name, msg.text, info ? info.color : null);
+        mpRestShowBubble(msg.id, msg.text);
       } else {
         const info = mpOthers[msg.id]; appendChatLine(msg.name, msg.text, info ? info.color : null);
         if(msg.isEmoji) mpShowSpeechBubble(msg.id, msg.text);
@@ -1573,6 +1588,7 @@ function mpShowWaitingVisuals(){
 }
 // ---------- 휴식의 땅 (자유 이동 + 채팅) ----------
 let mpRestOthers = {};
+let mpRestStars = {};
 let mpRestMe = { x: 450, y: 280, facing: 'down', moving: false, running: false };
 let mpRestKeys = { w:false, a:false, s:false, d:false, shift:false };
 let mpRestLoopId = null;
@@ -1586,10 +1602,13 @@ const REST_WALK_SPEED = 1.6, REST_RUN_SPEED = 3.0;
 function mpEnterRestMode(){
   mpActive = true; mpRoomMode = 'rest'; mpMatchStarted = true;
   mpRestOthers = {};
-  mpRestMe = { x: REST_MAP_W/2, y: REST_MAP_H/2, facing: 'down', moving: false, running: false };
+  mpRestStars = {};
+  mpRestStarPopup = null;
+  mpRestMe = { x: REST_MAP_W/2, y: FIRE_Y + 100, facing: 'up', moving: false, running: false };
   document.getElementById('rest-chat-log').innerHTML = '';
   document.getElementById('rest-chat-input-row').style.display = 'none';
   document.getElementById('rest-inventory').style.display = 'none';
+  document.getElementById('rest-esc-menu').style.display = 'none';
   if(!restCharConfigSaved){
     mpRestShowCharSetup();
   } else {
@@ -1620,7 +1639,12 @@ function mpRestExit(){
 }
 function mpRestKeyDown(e){
   if(document.getElementById('rest-charsetup').style.display !== 'none') return;
-  if(e.key === 'Escape'){ mpRestExit(); return; }
+  if(e.key === 'Escape'){
+    const menu = document.getElementById('rest-esc-menu');
+    menu.style.display = menu.style.display==='none' ? 'flex' : 'none';
+    return;
+  }
+  if(document.getElementById('rest-esc-menu').style.display !== 'none') return;
   if(e.key === 'Enter'){
     const row = document.getElementById('rest-chat-input-row');
     const input = document.getElementById('rest-chat-input');
@@ -1655,7 +1679,7 @@ function mpRestSendPosition(){
 }
 function mpRestLoop(){
   if(!mpActive || mpRoomMode!=='rest'){ return; }
-  const chatOpen = document.getElementById('rest-chat-input-row').style.display !== 'none';
+  const chatOpen = document.getElementById('rest-chat-input-row').style.display !== 'none' || document.getElementById('rest-esc-menu').style.display !== 'none';
   let dx=0, dy=0;
   if(!chatOpen){
     if(mpRestKeys.w) dy -= 1;
@@ -1669,8 +1693,16 @@ function mpRestLoop(){
   if(moving){
     const len = Math.sqrt(dx*dx+dy*dy);
     const speed = mpRestMe.running ? REST_RUN_SPEED : REST_WALK_SPEED;
-    mpRestMe.x = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_W-REST_CHAR_SIZE/2, mpRestMe.x + (dx/len)*speed));
-    mpRestMe.y = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_H-REST_CHAR_SIZE/2, mpRestMe.y + (dy/len)*speed));
+    let nx = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_W-REST_CHAR_SIZE/2, mpRestMe.x + (dx/len)*speed));
+    let ny = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_H-REST_CHAR_SIZE/2, mpRestMe.y + (dy/len)*speed));
+    const fdx = nx-FIRE_X, fdy = ny-FIRE_Y;
+    if(Math.sqrt(fdx*fdx+fdy*fdy) < FIRE_COLLIDE_RADIUS){
+      // 모닥불 밑동과는 겹칠 수 없음 - 밀어내기
+      const ang = Math.atan2(fdy,fdx);
+      nx = FIRE_X + Math.cos(ang)*FIRE_COLLIDE_RADIUS;
+      ny = FIRE_Y + Math.sin(ang)*FIRE_COLLIDE_RADIUS;
+    }
+    mpRestMe.x = nx; mpRestMe.y = ny;
     if(dy<0) mpRestMe.facing = 'up'; else if(dy>0) mpRestMe.facing = 'down';
     else if(dx<0) mpRestMe.facing = 'left'; else if(dx>0) mpRestMe.facing = 'right';
   }
@@ -1678,21 +1710,87 @@ function mpRestLoop(){
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
 const villageImgs = {};
-['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire'].forEach(name=>{
+['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire','tree-var1','tree-var2','tree-var3'].forEach(name=>{
   const img = new Image(); img.src = 'assets/village/'+name+'.png';
   villageImgs[name] = img;
 });
-const TREE_SCALE = 2.6;
+const TREE_SCALE = 3.2;
 const TREE_X = REST_MAP_W/2;
-const TREE_BASE_Y = REST_MAP_H/2 + 150;
-const TREE_SORT_Y = TREE_BASE_Y - 85*TREE_SCALE; // 이 y보다 위(작은 값)에 있으면 나무 뒤로 감
+const TREE_BASE_Y = REST_MAP_H/2 - 40;
+const TREE_SORT_Y = TREE_BASE_Y - 45*TREE_SCALE; // 이 y보다 위(작은 값)에 있으면 나무 뒤로 감
 const FIRE_X = TREE_X;
-const FIRE_Y = TREE_BASE_Y + 60;
-const FIRE_SCALE = 2.2;
+const FIRE_Y = TREE_BASE_Y + 140;
+const FIRE_SCALE = 1.3;
 const FIRE_FRAME_W = 60, FIRE_FRAME_H = 48, FIRE_FRAME_COUNT = 12;
+const FIRE_COLLIDE_RADIUS = 30;
 function drawTile(ctx, name, x, y, size){
   const img = villageImgs[name];
   if(img && img.complete && img.naturalWidth>0) ctx.drawImage(img, x, y, size, size);
+}
+function drawStarShape(ctx, x, y, r, color){
+  ctx.beginPath();
+  for(let i=0;i<5;i++){
+    const a1 = -Math.PI/2 + i*(Math.PI*2/5);
+    const a2 = a1 + Math.PI/5;
+    ctx.lineTo(x+Math.cos(a1)*r, y+Math.sin(a1)*r);
+    ctx.lineTo(x+Math.cos(a2)*r*0.42, y+Math.sin(a2)*r*0.42);
+  }
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+function mpRestRenderStars(ctx){
+  const t = Date.now();
+  for(const id in mpRestStars){
+    const s = mpRestStars[id];
+    const pulse = 0.7 + Math.sin(t/220 + s.x)*0.3;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.shadowColor = '#fff6c9'; ctx.shadowBlur = 14*pulse;
+    drawStarShape(ctx, s.x, s.y, 12, '#ffe066');
+    ctx.restore();
+  }
+}
+let mpRestStarPopup = null;
+function mpRestShowStarPopup(star){
+  mpRestStarPopup = { x: star ? star.x : mpRestMe.x, y: star ? star.y : mpRestMe.y, start: Date.now() };
+}
+let mpRestBubbles = {};
+function mpRestShowBubble(id, text){
+  const trimmed = (text||'').slice(0,40);
+  const lines = [];
+  for(let i=0;i<trimmed.length;i+=8) lines.push(trimmed.slice(i,i+8));
+  mpRestBubbles[id] = { lines, start: Date.now() };
+}
+function drawRestBubble(ctx, x, y, lines){
+  const fontSize = 12, lineH = 16, padX = 10, padY = 8;
+  ctx.font = fontSize+'px sans-serif';
+  let maxW = 0;
+  lines.forEach(l=>{ const w = ctx.measureText(l).width; if(w>maxW) maxW = w; });
+  const boxW = maxW + padX*2, boxH = lines.length*lineH + padY*2;
+  const boxX = x - boxW/2, boxY = y - boxH - 12;
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 1.5;
+  const r = 8;
+  ctx.beginPath();
+  ctx.moveTo(boxX+r, boxY);
+  ctx.arcTo(boxX+boxW, boxY, boxX+boxW, boxY+boxH, r);
+  ctx.arcTo(boxX+boxW, boxY+boxH, boxX, boxY+boxH, r);
+  ctx.arcTo(boxX, boxY+boxH, boxX, boxY, r);
+  ctx.arcTo(boxX, boxY, boxX+boxW, boxY, r);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x-6, boxY+boxH);
+  ctx.lineTo(x+6, boxY+boxH);
+  ctx.lineTo(x, boxY+boxH+8);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.textAlign = 'center';
+  lines.forEach((l,i)=>{ ctx.fillText(l, x, boxY+padY+fontSize*0.85+i*lineH); });
 }
 function mpRestBuildBackground(){
   const c = document.createElement('canvas'); c.width = REST_MAP_W; c.height = REST_MAP_H;
@@ -1714,6 +1812,24 @@ function mpRestBuildBackground(){
     const S = TREE_SCALE;
     ctx.drawImage(villageImgs['tree-big-trunk'], TREE_X-64*S, TREE_BASE_Y-53*S, 128*S, 53*S);
   }
+  // 주변 숲 나무들 - 4가지 종류를 불규칙하게 듬성듬성 배치, 같은 종류가 바로 옆에 오지 않도록
+  const forestTreeNames = ['tree-var1','tree-var2','tree-var3'];
+  const forestSpots = [
+    [140,120],[260,260],[110,420],[220,560],[90,650],
+    [1260,140],[1120,240],[1300,380],[1180,520],[1280,660],
+    [420,90],[620,70],[980,90],[500,660],[900,690],[760,700],
+    [340,480],[1050,470],[200,90],[1100,90]
+  ];
+  let lastTreeIdx = -1;
+  forestSpots.forEach(([sx,sy],i)=>{
+    let pick = Math.floor(rnd()*forestTreeNames.length);
+    if(pick===lastTreeIdx) pick = (pick+1)%forestTreeNames.length;
+    lastTreeIdx = pick;
+    const name = forestTreeNames[pick];
+    const scale = 1.3 + rnd()*0.9;
+    const w = 128*scale, h = 128*scale;
+    drawTile(ctx, name, sx-w/2, sy-h, w);
+  });
   return c;
 }
 const REST_CHAR_FRAME_SIZE = 64;
@@ -1832,21 +1948,43 @@ function mpRestRender(){
     mpRestBgCacheReady = Object.values(villageImgs).every(img=>img.complete && img.naturalWidth>0);
   }
   ctx.drawImage(mpRestBgCache, 0, 0);
-  drawCampfire(ctx, FIRE_X, FIRE_Y);
   const now = Date.now();
   // 캐릭터(들)와 나무 수관을 y좌표 기준으로 함께 정렬해서, 나무 뒤로 갈 때 자연스럽게 가려지도록 함
   const drawList = [{ kind:'canopy', y: TREE_SORT_Y }];
   for(const id in mpRestOthers){
     const o = mpRestOthers[id];
     if(now - o.lastSeen > 8000) continue;
-    drawList.push({ kind:'char', y:o.y, x:o.x, name:o.name, cfg:o.cfg, moving:o.moving, running:o.running, facing:o.facing });
+    drawList.push({ kind:'char', id, y:o.y, x:o.x, name:o.name, cfg:o.cfg, moving:o.moving, running:o.running, facing:o.facing });
   }
-  drawList.push({ kind:'char', y:mpRestMe.y, x:mpRestMe.x, name:(getNickname()||'나')+' (나)', cfg:restCharConfig, moving:mpRestMe.moving, running:mpRestMe.running, facing:mpRestMe.facing });
+  drawList.push({ kind:'char', id:mpPlayerId, y:mpRestMe.y, x:mpRestMe.x, name:(getNickname()||'나')+' (나)', cfg:restCharConfig, moving:mpRestMe.moving, running:mpRestMe.running, facing:mpRestMe.facing });
   drawList.sort((a,b)=>a.y-b.y);
+  for(const id in mpRestBubbles){ if(now - mpRestBubbles[id].start > 5000) delete mpRestBubbles[id]; }
   drawList.forEach(item=>{
     if(item.kind==='canopy') drawTreeCanopy(ctx);
-    else drawRestCharacter(ctx, item.x, item.y, item.name, item.cfg, item.moving, item.running, item.facing);
+    else {
+      drawRestCharacter(ctx, item.x, item.y, item.name, item.cfg, item.moving, item.running, item.facing);
+      const bubble = mpRestBubbles[item.id];
+      if(bubble) drawRestBubble(ctx, item.x, item.y-REST_CHAR_SIZE-4, bubble.lines);
+    }
   });
+  // 모닥불은 캐릭터보다 나중에 그려서 항상 앞쪽(불꽃 쪽)에 살짝 겹치도록
+  drawCampfire(ctx, FIRE_X, FIRE_Y);
+  mpRestRenderStars(ctx);
+  if(mpRestStarPopup){
+    const elapsed = Date.now() - mpRestStarPopup.start;
+    if(elapsed < 1200){
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - elapsed/1200);
+      ctx.fillStyle = '#ffe066';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+      ctx.fillText('+5', mpRestStarPopup.x, mpRestStarPopup.y - elapsed/12);
+      ctx.restore();
+    } else {
+      mpRestStarPopup = null;
+    }
+  }
   // 밤 조명: 모닥불 주변만 은은하게 밝고, 나머지는 어둡게 (마지막에 전체 위에 덧씌워서 캐릭터 밝기도 자연히 영향받음)
   const grad = ctx.createRadialGradient(FIRE_X, FIRE_Y, 10, FIRE_X, FIRE_Y, 420);
   grad.addColorStop(0, 'rgba(10,8,4,0.05)');
@@ -1932,7 +2070,8 @@ function mpRestRenderInventory(){
     cell.addEventListener('contextmenu', (e)=>{ e.preventDefault(); mpRestShowItemMenu(e, item.id); });
     grid.appendChild(cell);
   });
-  ['head','top','bottom'].forEach(slot=>{
+  const slotLabelKr = { head:'머리', top:'상의', bottom:'하의', shoes:'신발' };
+  ['head','top','bottom','shoes'].forEach(slot=>{
     const el = document.getElementById('rest-slot-'+slot);
     const equippedItem = restInventoryItems.find(i=>i.slot===slot && i.equipped);
     el.innerHTML = '';
@@ -1944,7 +2083,7 @@ function mpRestRenderInventory(){
       el.ondblclick = ()=> mpRestUnequip(slot);
     } else {
       el.classList.remove('filled');
-      el.innerHTML = `<span class="rest-slot-label">${slot}</span>`;
+      el.innerHTML = `<span class="rest-slot-label">${slotLabelKr[slot]}</span>`;
       el.ondblclick = null;
     }
   });
@@ -2007,6 +2146,8 @@ function mpRestShowColorPopup(itemId){
   popup.style.display = 'block';
 }
 document.getElementById('rest-color-close').addEventListener('click', ()=>{ document.getElementById('rest-color-popup').style.display='none'; });
+document.getElementById('rest-esc-resume-btn').addEventListener('click', ()=>{ document.getElementById('rest-esc-menu').style.display='none'; });
+document.getElementById('rest-esc-leave-btn').addEventListener('click', ()=>{ document.getElementById('rest-esc-menu').style.display='none'; mpRestExit(); });
 
 // ---------- 캐릭터 최초 설정 모달 ----------
 function mpRestUpdateCharSetupUI(){
@@ -2826,7 +2967,7 @@ function appendChatLine(name, text, color){
 }
 function mpSendChat(text, isEmoji){
   if(!text) return;
-  if(mpRoomMode === 'rest'){ appendRestChatLine('나', text, '#3ddbff'); }
+  if(mpRoomMode === 'rest'){ appendRestChatLine('나', text, '#3ddbff'); mpRestShowBubble(mpPlayerId, text); }
   else { appendChatLine('나', text, 'var(--cyan)'); }
   mpSend({type:'chat', text, isEmoji: !!isEmoji});
 }
