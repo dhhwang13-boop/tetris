@@ -162,7 +162,7 @@ function lobbyPayload(room) {
     players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ready: p.ready, isBot: !!p.isBot }))
   };
 }
-function modeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; return 5; }
+function modeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; if(mode === 'rest') return 4; return 5; }
 const TERRITORY_SIZE = 14;
 const FLAG_COLORS = ['#e24b4a', '#ff9c47', '#ffce45', '#52ff9d']; // 빨강/주황/노랑/초록
 const TERRITORY_CORNERS = [[0,0], [TERRITORY_SIZE-1,0], [0,TERRITORY_SIZE-1], [TERRITORY_SIZE-1,TERRITORY_SIZE-1]];
@@ -170,7 +170,7 @@ const DEFAULT_ROOM_TITLES = ['즐거운 게임해요!', '테트리스 초보만!
 
 function roomListPayload() {
   const list = [...rooms.values()]
-    .filter(r => (r.status === 'lobby' && r.players.size < modeMax(r.mode)) || (r.status === 'playing' && r.mode === 'classic5'))
+    .filter(r => (r.status === 'lobby' && r.players.size < modeMax(r.mode)) || (r.status === 'playing' && (r.mode === 'classic5' || r.mode === 'defense')))
     .map(r => ({
       roomId: r.id,
       title: r.title || null,
@@ -208,7 +208,7 @@ wss.on('connection', (ws, req) => {
       const id = String(msg.roomId || '').toUpperCase();
       const room = rooms.get(id);
       if (!room) { send(ws, { type: 'error', message: '해당 방을 찾을 수 없어요.' }); return; }
-      if (room.mode !== 'classic5') { send(ws, { type: 'error', message: '이 모드는 관전을 지원하지 않아요.' }); return; }
+      if (room.mode !== 'classic5' && room.mode !== 'defense') { send(ws, { type: 'error', message: '이 모드는 관전을 지원하지 않아요.' }); return; }
       if (room.isPrivate && String(msg.password || '') !== room.password) {
         send(ws, { type: 'error', message: '코드가 올바르지 않아요.' });
         return;
@@ -277,12 +277,12 @@ wss.on('connection', (ws, req) => {
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
       const title = String(msg.roomTitle || '').trim().slice(0, 20) || DEFAULT_ROOM_TITLES[Math.floor(Math.random() * DEFAULT_ROOM_TITLES.length)];
-      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : (msg.mode === 'defense' ? 'defense' : 'classic5'));
+      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : (msg.mode === 'defense' ? 'defense' : (msg.mode === 'rest' ? 'rest' : 'classic5')));
       const room = { id, title, mode, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map(), spectators: new Map() };
       room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0, ip: ws.ip });
       rooms.set(id, room);
       ws.playerId = hostId; ws.roomId = id;
-      send(ws, { type: 'created', roomId: id, playerId: hostId });
+      send(ws, { type: 'created', roomId: id, playerId: hostId, mode: room.mode });
       broadcast(room, lobbyPayload(room));
       return;
     }
@@ -300,7 +300,7 @@ wss.on('connection', (ws, req) => {
       const id2 = uid();
       room.players.set(id2, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: false, alive: true, score: 0, lines: 0, ip: ws.ip });
       ws.playerId = id2; ws.roomId = id;
-      send(ws, { type: 'joined', roomId: id, playerId: id2 });
+      send(ws, { type: 'joined', roomId: id, playerId: id2, mode: room.mode });
       broadcast(room, lobbyPayload(room));
       return;
     }
@@ -309,6 +309,12 @@ wss.on('connection', (ws, req) => {
     if (!room || !ws.playerId) return;
     const me = room.players.get(ws.playerId);
     if (!me) return;
+
+    if (msg.type === 'restMove') {
+      if (room.mode !== 'rest') return;
+      broadcast(room, { type: 'restPlayerUpdate', id: ws.playerId, name: me.name, x: msg.x, y: msg.y, facing: msg.facing, moving: !!msg.moving, running: !!msg.running }, ws.playerId);
+      return;
+    }
 
     if (msg.type === 'ready') {
       me.ready = !!msg.ready;
@@ -424,7 +430,11 @@ wss.on('connection', (ws, req) => {
     }
     if (room.players.size === 0) return; // 관전자만 남은 경우 방은 유지하되 더 진행할 참가자가 없음
     if (room.status === 'lobby') {
-      broadcast(room, lobbyPayload(room));
+      if (room.mode === 'rest') {
+        broadcastAll(room, { type: 'restPlayerLeft', id: ws.playerId });
+      } else {
+        broadcast(room, lobbyPayload(room));
+      }
     } else if (room.status === 'playing') {
       if (room.mode === 'territory') {
         const humansLeft = [...room.players.values()].filter(p => !p.isBot).length;
