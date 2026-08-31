@@ -32,13 +32,13 @@
   .screen{ display:none; height:100vh; }
   .rest-wrap{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .5s; background:#0a0e14; }
   .rest-wrap.fading{ opacity:0; }
-  #rest-canvas{ border:none; background:#3a6b34; max-width:100vw; max-height:100vh; width:auto; height:100vh; object-fit:contain; }
+  #rest-canvas{ border:none; background:#3a6b34; width:100%; height:100%; display:block; }
   .rest-chat-log{
-    position:absolute; left:20px; bottom:76px; width:460px; max-height:260px; overflow-y:auto;
+    position:absolute; left:36px; bottom:96px; width:460px; max-height:400px; overflow-y:auto;
     background:rgba(10,14,20,0.7); border:1px solid var(--line); border-radius:8px; padding:10px 14px; font-size:14px;
     display:flex; flex-direction:column; gap:5px;
   }
-  .rest-chat-input-row{ position:absolute; left:20px; bottom:20px; width:460px; }
+  .rest-chat-input-row{ position:absolute; left:36px; bottom:36px; width:460px; }
   .rest-chat-input-row input{
     width:100%; background:var(--bg); border:1px solid var(--cyan); color:var(--text); padding:10px 12px;
     border-radius:6px; font-family:inherit; font-size:14px; outline:none;
@@ -794,7 +794,7 @@
     <div class="rest-chat-input-row" id="rest-chat-input-row" style="display:none;">
       <input type="text" id="rest-chat-input" maxlength="120" placeholder="메시지를 입력하고 Enter...">
     </div>
-    <div class="rest-hint">WASD 이동 · Shift 달리기 · Enter 채팅 · I 인벤토리 · Esc 나가기</div>
+    
 
     <div class="rest-inventory" id="rest-inventory" style="display:none;">
       <div class="rest-inv-title">인벤토리</div>
@@ -1691,10 +1691,15 @@ function mpRestBuildBackground(){
   const ctx = c.getContext('2d');
   let seed = 7;
   function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
-  // 잔디 바닥을 실제 타일로 깔기 - 일단은 전부 초록 풀 + 간간이 꽃
+  // 잔디 바닥을 실제 타일로 깔기 - 흙 없이 초록 풀 전용 + 회전으로 반복 패턴 완화 + 노란 꽃 불규칙 배치
   const TS = 32;
   for(let y=0;y<REST_MAP_H;y+=TS) for(let x=0;x<REST_MAP_W;x+=TS){
-    drawTile(ctx, rnd()<0.1 ? 'grass-flower' : 'grass-plain', x, y, TS);
+    const isFlower = rnd() < 0.06;
+    ctx.save();
+    ctx.translate(x+TS/2, y+TS/2);
+    ctx.rotate(Math.floor(rnd()*4) * Math.PI/2);
+    drawTile(ctx, isFlower ? 'grass-flower' : 'grass-plain', -TS/2, -TS/2, TS);
+    ctx.restore();
   }
   return c;
 }
