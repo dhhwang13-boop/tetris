@@ -1721,7 +1721,7 @@ function mpRestLoop(){
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
 const villageImgs = {};
-['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire','tree-var1','tree-var2','tree-var3'].forEach(name=>{
+['grass-plain-v2','grass-flower-v2','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire','tree-var1','tree-var2','tree-var3'].forEach(name=>{
   const img = new Image(); img.src = 'assets/village/'+name+'.png';
   villageImgs[name] = img;
 });
@@ -1815,7 +1815,7 @@ function mpRestBuildBackground(){
     ctx.save();
     ctx.translate(x+TS/2, y+TS/2);
     ctx.rotate(Math.floor(rnd()*4) * Math.PI/2);
-    drawTile(ctx, isFlower ? 'grass-flower' : 'grass-plain', -TS/2, -TS/2, TS);
+    drawTile(ctx, isFlower ? 'grass-flower-v2' : 'grass-plain-v2', -TS/2, -TS/2, TS);
     ctx.restore();
   }
   // 나무 기둥은 배경에 고정 (캐릭터가 항상 기둥보다 앞에 보이도록)
@@ -2006,11 +2006,11 @@ function mpRestRender(){
   // 밤 조명: 모닥불 주변만 은은하게 밝고, 나머지는 어둡게 (마지막에 전체 위에 덧씌워서 캐릭터 밝기도 자연히 영향받음)
   const grad = ctx.createRadialGradient(FIRE_X, FIRE_Y, 8, FIRE_X, FIRE_Y, 850);
   grad.addColorStop(0, 'rgba(10,8,4,0.05)');
-  grad.addColorStop(0.12, 'rgba(8,8,14,0.25)');
-  grad.addColorStop(0.28, 'rgba(6,6,12,0.5)');
-  grad.addColorStop(0.5, 'rgba(5,5,11,0.72)');
-  grad.addColorStop(0.75, 'rgba(4,4,10,0.86)');
-  grad.addColorStop(1, 'rgba(2,2,6,0.95)');
+  grad.addColorStop(0.09, 'rgba(8,8,14,0.4)');
+  grad.addColorStop(0.18, 'rgba(6,6,12,0.72)');
+  grad.addColorStop(0.32, 'rgba(4,4,10,0.9)');
+  grad.addColorStop(0.55, 'rgba(2,2,6,0.97)');
+  grad.addColorStop(1, 'rgba(0,0,2,0.995)');
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,canvas.width,canvas.height);
 }
