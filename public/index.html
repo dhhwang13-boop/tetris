@@ -1678,10 +1678,18 @@ function mpRestLoop(){
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
 const villageImgs = {};
-['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence'].forEach(name=>{
+['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire'].forEach(name=>{
   const img = new Image(); img.src = 'assets/village/'+name+'.png';
   villageImgs[name] = img;
 });
+const TREE_SCALE = 2.6;
+const TREE_X = REST_MAP_W/2;
+const TREE_BASE_Y = REST_MAP_H/2 + 150;
+const TREE_SORT_Y = TREE_BASE_Y - 85*TREE_SCALE; // 이 y보다 위(작은 값)에 있으면 나무 뒤로 감
+const FIRE_X = TREE_X;
+const FIRE_Y = TREE_BASE_Y + 60;
+const FIRE_SCALE = 2.2;
+const FIRE_FRAME_W = 60, FIRE_FRAME_H = 48, FIRE_FRAME_COUNT = 12;
 function drawTile(ctx, name, x, y, size){
   const img = villageImgs[name];
   if(img && img.complete && img.naturalWidth>0) ctx.drawImage(img, x, y, size, size);
@@ -1700,6 +1708,11 @@ function mpRestBuildBackground(){
     ctx.rotate(Math.floor(rnd()*4) * Math.PI/2);
     drawTile(ctx, isFlower ? 'grass-flower' : 'grass-plain', -TS/2, -TS/2, TS);
     ctx.restore();
+  }
+  // 나무 기둥은 배경에 고정 (캐릭터가 항상 기둥보다 앞에 보이도록)
+  if(villageImgs['tree-big-trunk'] && villageImgs['tree-big-trunk'].complete && villageImgs['tree-big-trunk'].naturalWidth>0){
+    const S = TREE_SCALE;
+    ctx.drawImage(villageImgs['tree-big-trunk'], TREE_X-64*S, TREE_BASE_Y-53*S, 128*S, 53*S);
   }
   return c;
 }
@@ -1797,6 +1810,19 @@ function drawRestCharacter(ctx, x, y, name, cfg, moving, running, facing){
     ctx.shadowBlur = 0;
   }
 }
+function drawCampfire(ctx, x, y){
+  const img = villageImgs['campfire'];
+  if(!img || !img.complete || img.naturalWidth===0) return;
+  const frame = Math.floor(Date.now()/80) % FIRE_FRAME_COUNT;
+  const w = FIRE_FRAME_W*FIRE_SCALE, h = FIRE_FRAME_H*FIRE_SCALE;
+  ctx.drawImage(img, frame*FIRE_FRAME_W, 0, FIRE_FRAME_W, FIRE_FRAME_H, x-w/2, y-h, w, h);
+}
+function drawTreeCanopy(ctx){
+  const img = villageImgs['tree-big-canopy'];
+  if(!img || !img.complete || img.naturalWidth===0) return;
+  const S = TREE_SCALE;
+  ctx.drawImage(img, TREE_X-64*S, TREE_BASE_Y-128*S, 128*S, 100*S);
+}
 function mpRestRender(){
   const canvas = document.getElementById('rest-canvas');
   if(!canvas) return;
@@ -1806,13 +1832,28 @@ function mpRestRender(){
     mpRestBgCacheReady = Object.values(villageImgs).every(img=>img.complete && img.naturalWidth>0);
   }
   ctx.drawImage(mpRestBgCache, 0, 0);
+  drawCampfire(ctx, FIRE_X, FIRE_Y);
   const now = Date.now();
+  // 캐릭터(들)와 나무 수관을 y좌표 기준으로 함께 정렬해서, 나무 뒤로 갈 때 자연스럽게 가려지도록 함
+  const drawList = [{ kind:'canopy', y: TREE_SORT_Y }];
   for(const id in mpRestOthers){
     const o = mpRestOthers[id];
-    if(now - o.lastSeen > 8000) continue; // 오래 소식없으면 표시 제외
-    drawRestCharacter(ctx, o.x, o.y, o.name, o.cfg, o.moving, o.running, o.facing);
+    if(now - o.lastSeen > 8000) continue;
+    drawList.push({ kind:'char', y:o.y, x:o.x, name:o.name, cfg:o.cfg, moving:o.moving, running:o.running, facing:o.facing });
   }
-  drawRestCharacter(ctx, mpRestMe.x, mpRestMe.y, (getNickname()||'나')+' (나)', restCharConfig, mpRestMe.moving, mpRestMe.running, mpRestMe.facing);
+  drawList.push({ kind:'char', y:mpRestMe.y, x:mpRestMe.x, name:(getNickname()||'나')+' (나)', cfg:restCharConfig, moving:mpRestMe.moving, running:mpRestMe.running, facing:mpRestMe.facing });
+  drawList.sort((a,b)=>a.y-b.y);
+  drawList.forEach(item=>{
+    if(item.kind==='canopy') drawTreeCanopy(ctx);
+    else drawRestCharacter(ctx, item.x, item.y, item.name, item.cfg, item.moving, item.running, item.facing);
+  });
+  // 밤 조명: 모닥불 주변만 은은하게 밝고, 나머지는 어둡게 (마지막에 전체 위에 덧씌워서 캐릭터 밝기도 자연히 영향받음)
+  const grad = ctx.createRadialGradient(FIRE_X, FIRE_Y, 10, FIRE_X, FIRE_Y, 420);
+  grad.addColorStop(0, 'rgba(10,8,4,0.05)');
+  grad.addColorStop(0.35, 'rgba(8,8,14,0.35)');
+  grad.addColorStop(1, 'rgba(4,4,10,0.86)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 function appendRestChatLine(name, text, color){
   const log = document.getElementById('rest-chat-log');
