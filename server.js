@@ -595,8 +595,13 @@ function defenseRoundDuration(round){
   if (round === 4) return 120000;
   return DEFENSE_ROUND_MS;
 }
+const DEFENSE_SPAWN_BATCH = 2;
 function defenseTargetSpawnCount(round, playerCount){
-  return Math.max(1, playerCount) * 3 * round;
+  return Math.max(1, playerCount) * 5 * round;
+}
+function defenseSpawnInterval(round, playerCount){
+  const duration = defenseRoundDuration(round);
+  return duration * DEFENSE_SPAWN_BATCH / defenseTargetSpawnCount(round, playerCount);
 }
 function initDefenseState(room){
   const now = Date.now();
@@ -605,7 +610,7 @@ function initDefenseState(room){
     round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP,
     monsters: [], boss: null,
     roundEndAt: now + defenseRoundDuration(1),
-    spawnInterval: defenseRoundDuration(1) / defenseTargetSpawnCount(1, playerCount),
+    spawnInterval: defenseSpawnInterval(1, playerCount),
     nextSpawnAt: now + 500,
     pendingRoundAt: null,
     gold: {}, ended: false,
@@ -685,15 +690,17 @@ function startDefenseLoop(room){
         const duration = defenseRoundDuration(d.round);
         d.roundEndAt = now + duration;
         d.nextSpawnAt = now;
-        d.spawnInterval = duration / defenseTargetSpawnCount(d.round, playerCount);
+        d.spawnInterval = defenseSpawnInterval(d.round, playerCount);
       }
     }
     if (d.round !== 5) {
       if (now >= d.nextSpawnAt) {
         const pool = defenseMonsterPool(d.round);
-        const type = pool[Math.floor(Math.random() * pool.length)];
-        const hp = DEFENSE_MONSTER_HP[type] || 1;
-        d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS, hp, maxHp: hp });
+        for (let i = 0; i < DEFENSE_SPAWN_BATCH; i++) {
+          const type = pool[Math.floor(Math.random() * pool.length)];
+          const hp = DEFENSE_MONSTER_HP[type] || 1;
+          d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS, hp, maxHp: hp });
+        }
         d.nextSpawnAt = now + d.spawnInterval;
       }
       d.monsters = d.monsters.filter(m => {
