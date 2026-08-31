@@ -661,7 +661,7 @@ function broadcastDefenseUpdate(room){
     type: 'defenseUpdate', round: d.round, teamHp: d.teamHp, maxHp: d.maxHp,
     roundRemainMs: Math.max(0, d.roundEndAt - now),
     pending: !!(d.pendingRoundAt && now < d.pendingRoundAt),
-    monsters: d.monsters.map(m => ({ id: m.id, type: m.type, progress: Math.min(1, (now - m.spawnAt) / m.travelMs), hp: m.hp, maxHp: m.maxHp })),
+    monsters: d.monsters.map(m => ({ id: m.id, type: m.type, progress: Math.min(1, (now - m.spawnAt) / m.travelMs), hp: m.hp, maxHp: m.maxHp, lane: m.lane })),
     boss: d.boss ? { id: d.boss.id, progress: Math.min(1, (now - d.boss.spawnAt) / d.boss.travelMs), hp: d.boss.hp, maxHp: d.boss.maxHp } : null,
   });
 }
@@ -738,7 +738,10 @@ function startDefenseLoop(room){
         for (let i = 0; i < DEFENSE_SPAWN_BATCH; i++) {
           const type = pool[Math.floor(Math.random() * pool.length)];
           const hp = DEFENSE_MONSTER_HP[type] || 1;
-          d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS, hp, maxHp: hp });
+          if (d.nextLane === undefined) d.nextLane = 0;
+          const lane = d.nextLane;
+          d.nextLane = (d.nextLane + 1) % 5;
+          d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS, hp, maxHp: hp, lane });
         }
         d.nextSpawnAt = now + d.spawnInterval;
       }
