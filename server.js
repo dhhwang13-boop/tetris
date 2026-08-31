@@ -312,7 +312,7 @@ wss.on('connection', (ws, req) => {
 
     if (msg.type === 'restMove') {
       if (room.mode !== 'rest') return;
-      broadcast(room, { type: 'restPlayerUpdate', id: ws.playerId, name: me.name, x: msg.x, y: msg.y, facing: msg.facing, moving: !!msg.moving, running: !!msg.running }, ws.playerId);
+      broadcast(room, { type: 'restPlayerUpdate', id: ws.playerId, name: me.name, x: msg.x, y: msg.y, facing: msg.facing, moving: !!msg.moving, running: !!msg.running, gender: msg.gender, shirtColor: msg.shirtColor, pantsColor: msg.pantsColor, shoesColor: msg.shoesColor }, ws.playerId);
       return;
     }
 
@@ -345,7 +345,7 @@ wss.on('connection', (ws, req) => {
           room.territoryTimer = setTimeout(() => endTerritoryMatch(room), 180000);
         } else if (room.mode === 'defense') {
           initDefenseState(room);
-          broadcastAll(room, { type: 'gameStart', players: playerList, mode: room.mode, defense: { round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP, roundRemainMs: DEFENSE_ROUND_MS } });
+          broadcastAll(room, { type: 'gameStart', players: playerList, mode: room.mode, defense: { round: 1, teamHp: room.defense.teamHp, maxHp: room.defense.maxHp, roundRemainMs: DEFENSE_ROUND_MS } });
           startBotSimulation(room);
           startDefenseLoop(room);
         } else {
@@ -590,8 +590,8 @@ const DEFENSE_ROUND_MS = 60000;
 const DEFENSE_BOSS_MS = 180000;
 const DEFENSE_MONSTER_HP = { zombie: 1, wraith: 1, fire: 3, blue: 10 };
 const DEFENSE_MONSTER_TRAVEL_MS = 14000;
-const DEFENSE_BOSS_HP = 65;
-const DEFENSE_START_HP = 100;
+const DEFENSE_BOSS_HP_PER_PLAYER = 30;
+const DEFENSE_HP_PER_PLAYER = 30;
 const DEFENSE_ROUND_GAP_MS = 5000;
 
 function defenseMonsterPool(round){
@@ -616,8 +616,9 @@ function defenseSpawnInterval(round, playerCount){
 function initDefenseState(room){
   const now = Date.now();
   const playerCount = room.players.size;
+  const startHp = DEFENSE_HP_PER_PLAYER * Math.max(1, playerCount);
   room.defense = {
-    round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP,
+    round: 1, teamHp: startHp, maxHp: startHp,
     monsters: [], boss: null,
     roundEndAt: now + defenseRoundDuration(1),
     spawnInterval: defenseSpawnInterval(1, playerCount),
@@ -694,7 +695,8 @@ function startDefenseLoop(room){
       d.pendingRoundAt = null;
       const playerCount = room.players.size;
       if (d.round === 5) {
-        d.boss = { id: uid(), spawnAt: now, travelMs: DEFENSE_BOSS_MS, hp: DEFENSE_BOSS_HP, maxHp: DEFENSE_BOSS_HP };
+        const bossHp = DEFENSE_BOSS_HP_PER_PLAYER * Math.max(1, playerCount);
+        d.boss = { id: uid(), spawnAt: now, travelMs: DEFENSE_BOSS_MS, hp: bossHp, maxHp: bossHp };
         d.roundEndAt = now + DEFENSE_BOSS_MS;
       } else {
         const duration = defenseRoundDuration(d.round);
