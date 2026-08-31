@@ -578,12 +578,23 @@ function startBotSimulation(room){
 // ---------- "침공저지" 협동 디펜스 모드 ----------
 const DEFENSE_ROUND_MS = 60000;
 const DEFENSE_BOSS_MS = 180000;
-const DEFENSE_MONSTER_TYPES = ['zombie', 'wraith'];
+const DEFENSE_MONSTER_HP = { zombie: 1, wraith: 1, fire: 3, blue: 10 };
 const DEFENSE_MONSTER_TRAVEL_MS = 14000;
 const DEFENSE_BOSS_HP = 65;
 const DEFENSE_START_HP = 100;
 const DEFENSE_ROUND_GAP_MS = 5000;
 
+function defenseMonsterPool(round){
+  const pool = ['zombie', 'wraith'];
+  if (round >= 2) pool.push('fire');
+  if (round >= 3) pool.push('blue');
+  return pool;
+}
+function defenseRoundDuration(round){
+  if (round === 3) return 90000;
+  if (round === 4) return 120000;
+  return DEFENSE_ROUND_MS;
+}
 function defenseTargetSpawnCount(round, playerCount){
   return Math.max(1, playerCount) * 3 * round;
 }
@@ -593,8 +604,8 @@ function initDefenseState(room){
   room.defense = {
     round: 1, teamHp: DEFENSE_START_HP, maxHp: DEFENSE_START_HP,
     monsters: [], boss: null,
-    roundEndAt: now + DEFENSE_ROUND_MS,
-    spawnInterval: DEFENSE_ROUND_MS / defenseTargetSpawnCount(1, playerCount),
+    roundEndAt: now + defenseRoundDuration(1),
+    spawnInterval: defenseRoundDuration(1) / defenseTargetSpawnCount(1, playerCount),
     nextSpawnAt: now + 500,
     pendingRoundAt: null,
     gold: {}, ended: false,
@@ -607,7 +618,7 @@ function broadcastDefenseUpdate(room){
     type: 'defenseUpdate', round: d.round, teamHp: d.teamHp, maxHp: d.maxHp,
     roundRemainMs: Math.max(0, d.roundEndAt - now),
     pending: !!(d.pendingRoundAt && now < d.pendingRoundAt),
-    monsters: d.monsters.map(m => ({ id: m.id, type: m.type, progress: Math.min(1, (now - m.spawnAt) / m.travelMs) })),
+    monsters: d.monsters.map(m => ({ id: m.id, type: m.type, progress: Math.min(1, (now - m.spawnAt) / m.travelMs), hp: m.hp, maxHp: m.maxHp })),
     boss: d.boss ? { id: d.boss.id, progress: Math.min(1, (now - d.boss.spawnAt) / d.boss.travelMs), hp: d.boss.hp, maxHp: d.boss.maxHp } : null,
   });
 }
@@ -646,7 +657,14 @@ function applyDefenseDamage(room, amount){
   } else {
     const now = Date.now();
     d.monsters.sort((a, b) => ((now - b.spawnAt) / b.travelMs) - ((now - a.spawnAt) / a.travelMs));
-    d.monsters.splice(0, amount);
+    let remaining = amount;
+    const survivors = [];
+    for (const m of d.monsters) {
+      if (remaining <= 0) { survivors.push(m); continue; }
+      if (m.hp <= remaining) { remaining -= m.hp; }
+      else { m.hp -= remaining; remaining = 0; survivors.push(m); }
+    }
+    d.monsters = survivors;
   }
   broadcastDefenseUpdate(room);
 }
@@ -664,15 +682,18 @@ function startDefenseLoop(room){
         d.boss = { id: uid(), spawnAt: now, travelMs: DEFENSE_BOSS_MS, hp: DEFENSE_BOSS_HP, maxHp: DEFENSE_BOSS_HP };
         d.roundEndAt = now + DEFENSE_BOSS_MS;
       } else {
-        d.roundEndAt = now + DEFENSE_ROUND_MS;
+        const duration = defenseRoundDuration(d.round);
+        d.roundEndAt = now + duration;
         d.nextSpawnAt = now;
-        d.spawnInterval = DEFENSE_ROUND_MS / defenseTargetSpawnCount(d.round, playerCount);
+        d.spawnInterval = duration / defenseTargetSpawnCount(d.round, playerCount);
       }
     }
     if (d.round !== 5) {
       if (now >= d.nextSpawnAt) {
-        const type = DEFENSE_MONSTER_TYPES[Math.floor(Math.random() * DEFENSE_MONSTER_TYPES.length)];
-        d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS });
+        const pool = defenseMonsterPool(d.round);
+        const type = pool[Math.floor(Math.random() * pool.length)];
+        const hp = DEFENSE_MONSTER_HP[type] || 1;
+        d.monsters.push({ id: uid(), type, spawnAt: now, travelMs: DEFENSE_MONSTER_TRAVEL_MS, hp, maxHp: hp });
         d.nextSpawnAt = now + d.spawnInterval;
       }
       d.monsters = d.monsters.filter(m => {
