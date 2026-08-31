@@ -32,39 +32,41 @@
   .screen{ display:none; height:100vh; }
   .rest-wrap{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .5s; background:#0a0e14; }
   .rest-wrap.fading{ opacity:0; }
-  #rest-canvas{ border:1px solid var(--line); border-radius:8px; background:#3a6b34; }
+  #rest-canvas{ border:none; background:#3a6b34; max-width:100vw; max-height:100vh; width:auto; height:100vh; object-fit:contain; }
   .rest-chat-log{
-    position:absolute; left:20px; bottom:56px; width:320px; max-height:160px; overflow-y:auto;
-    background:rgba(10,14,20,0.7); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px;
-    display:flex; flex-direction:column; gap:3px;
+    position:absolute; left:20px; bottom:76px; width:460px; max-height:260px; overflow-y:auto;
+    background:rgba(10,14,20,0.7); border:1px solid var(--line); border-radius:8px; padding:10px 14px; font-size:14px;
+    display:flex; flex-direction:column; gap:5px;
   }
-  .rest-chat-input-row{ position:absolute; left:20px; bottom:16px; width:320px; }
+  .rest-chat-input-row{ position:absolute; left:20px; bottom:20px; width:460px; }
   .rest-chat-input-row input{
-    width:100%; background:var(--bg); border:1px solid var(--cyan); color:var(--text); padding:8px 10px;
-    border-radius:6px; font-family:inherit; font-size:13px; outline:none;
+    width:100%; background:var(--bg); border:1px solid var(--cyan); color:var(--text); padding:10px 12px;
+    border-radius:6px; font-family:inherit; font-size:14px; outline:none;
   }
   .rest-hint{ position:absolute; right:20px; bottom:16px; font-size:11px; color:var(--dim); background:rgba(10,14,20,0.6); padding:6px 10px; border-radius:6px; }
   .rest-name-tag{ position:absolute; pointer-events:none; font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.8); }
   .rest-inventory{
-    position:absolute; top:16px; right:16px; width:230px; background:rgba(12,16,24,0.95);
-    border:1px solid var(--line); border-radius:10px; padding:12px; z-index:10;
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:320px; background:rgba(12,16,24,0.95);
+    border:1px solid var(--line); border-radius:10px; padding:16px; z-index:10;
   }
-  .rest-inv-title{ font-size:13px; font-weight:900; color:var(--cyan); margin-bottom:8px; }
-  .rest-inv-equip-area{ display:flex; gap:10px; align-items:flex-start; }
-  #rest-inv-preview{ background:#1a2230; border:1px solid var(--line); border-radius:6px; }
-  .rest-equip-slots{ display:flex; flex-direction:column; gap:6px; flex:1; }
+  .rest-inv-title{ font-size:14px; font-weight:900; color:var(--cyan); margin-bottom:10px; }
+  .rest-inv-equip-area{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  #rest-inv-preview{ background:transparent; }
+  .rest-equip-slots-side{ display:flex; flex-direction:column; gap:14px; }
   .rest-equip-slot{
-    height:30px; background:var(--bg2); border:1px dashed var(--line); border-radius:6px;
-    display:flex; align-items:center; justify-content:center; position:relative; font-size:10px; color:var(--dim);
+    width:46px; height:28px; background:var(--bg2); border:1px solid var(--line); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; position:relative; cursor:pointer;
   }
-  .rest-equip-slot.filled{ border-style:solid; border-color:var(--cyan); }
-  .rest-slot-label{ position:absolute; text-transform:uppercase; letter-spacing:1px; }
-  .rest-inv-divider{ height:1px; background:var(--line); margin:10px 0; }
-  .rest-inv-items{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; max-height:180px; overflow-y:auto; }
+  .rest-equip-slot.filled{ border-color:var(--cyan); }
+  .rest-equip-slot canvas{ width:80%; height:80%; }
+  .rest-slot-label{ position:absolute; text-transform:uppercase; letter-spacing:1px; font-size:8px; color:var(--dim); top:-14px; white-space:nowrap; }
+  .rest-inv-divider{ height:1px; background:var(--line); margin:16px 0 12px; }
+  .rest-inv-items{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 8px; max-height:200px; overflow-y:auto; padding:2px; }
   .rest-inv-item{
-    width:100%; aspect-ratio:1; background:var(--bg2); border:1px solid var(--line); border-radius:6px;
+    width:100%; height:30px; background:var(--bg2); border:1px solid var(--line); border-radius:50%;
     display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;
   }
+  .rest-inv-item canvas{ width:75%; height:75%; }
   .rest-inv-item:hover{ border-color:var(--cyan); }
   .rest-inv-item canvas{ width:80%; height:80%; }
   .rest-color-popup{
@@ -787,7 +789,7 @@
 <!-- ================= 휴식의 땅 (자유 이동 + 채팅 공간) ================= -->
 <div class="screen" id="screen-rest">
   <div class="rest-wrap" id="rest-wrap">
-    <canvas id="rest-canvas" width="900" height="560"></canvas>
+    <canvas id="rest-canvas" width="1400" height="760"></canvas>
     <div class="rest-chat-log" id="rest-chat-log"></div>
     <div class="rest-chat-input-row" id="rest-chat-input-row" style="display:none;">
       <input type="text" id="rest-chat-input" maxlength="120" placeholder="메시지를 입력하고 Enter...">
@@ -797,10 +799,12 @@
     <div class="rest-inventory" id="rest-inventory" style="display:none;">
       <div class="rest-inv-title">인벤토리</div>
       <div class="rest-inv-equip-area">
-        <canvas id="rest-inv-preview" width="80" height="110"></canvas>
-        <div class="rest-equip-slots">
+        <div class="rest-equip-slots-side">
           <div class="rest-equip-slot" data-slot="head" id="rest-slot-head"><span class="rest-slot-label">head</span></div>
           <div class="rest-equip-slot" data-slot="top" id="rest-slot-top"><span class="rest-slot-label">top</span></div>
+        </div>
+        <canvas id="rest-inv-preview" width="80" height="110"></canvas>
+        <div class="rest-equip-slots-side">
           <div class="rest-equip-slot" data-slot="bottom" id="rest-slot-bottom"><span class="rest-slot-label">bottom</span></div>
         </div>
       </div>
@@ -1575,7 +1579,7 @@ let mpRestLoopId = null;
 let mpRestSendTimer = null;
 let mpRestBgCache = null;
 let mpRestBgCacheReady = false;
-const REST_MAP_W = 900, REST_MAP_H = 560;
+const REST_MAP_W = 1400, REST_MAP_H = 760;
 const REST_CHAR_SIZE = 68; // 침공저지 몬스터(34) 대비 2배
 const REST_WALK_SPEED = 1.6, REST_RUN_SPEED = 3.0;
 
@@ -1687,46 +1691,11 @@ function mpRestBuildBackground(){
   const ctx = c.getContext('2d');
   let seed = 7;
   function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
-  // 잔디 바닥을 실제 타일로 깔기
+  // 잔디 바닥을 실제 타일로 깔기 - 일단은 전부 초록 풀 + 간간이 꽃
   const TS = 32;
   for(let y=0;y<REST_MAP_H;y+=TS) for(let x=0;x<REST_MAP_W;x+=TS){
-    drawTile(ctx, rnd()<0.12 ? 'grass-flower' : 'grass-plain', x, y, TS);
+    drawTile(ctx, rnd()<0.1 ? 'grass-flower' : 'grass-plain', x, y, TS);
   }
-  // 강
-  ctx.fillStyle = '#3d78b8';
-  ctx.beginPath();
-  ctx.moveTo(0,80); ctx.quadraticCurveTo(200,140,180,260); ctx.quadraticCurveTo(160,380,320,420);
-  ctx.lineTo(320,470); ctx.quadraticCurveTo(140,430,120,280); ctx.quadraticCurveTo(140,150,0,130); ctx.closePath(); ctx.fill();
-  // 밭
-  ctx.fillStyle = '#8a6a3a';
-  for(let r=0;r<3;r++) for(let col=0;col<4;col++){
-    ctx.fillRect(560+col*36, 60+r*30, 30, 24);
-  }
-  ctx.fillStyle = '#6a9a3a';
-  for(let r=0;r<3;r++) for(let col=0;col<4;col++){
-    ctx.fillRect(560+col*36, 60+r*30, 30, 6);
-  }
-  // 길 (흙길 타일로)
-  for(let y=0;y<REST_MAP_H;y+=TS) drawTile(ctx, 'dirt-patch', 420, y, TS), drawTile(ctx, 'dirt-patch', 452, y, TS);
-  for(let x=0;x<REST_MAP_W;x+=TS) drawTile(ctx, 'dirt-patch', x, 300, TS), drawTile(ctx, 'dirt-patch', x, 332, TS);
-  // 건물
-  function building(x,y,w,h,color){
-    ctx.fillStyle = color; ctx.fillRect(x,y,w,h);
-    ctx.fillStyle = '#5a3a25'; ctx.fillRect(x-6,y-18,w+12,20);
-    ctx.fillStyle = '#3a2818'; ctx.fillRect(x+w/2-6,y+h-24,16,24);
-  }
-  building(560,340,90,70,'#c96a4a');
-  building(700,360,80,60,'#b9a26a');
-  building(140,60,80,60,'#8a9ac9');
-  // 울타리 (밭/마을 경계 장식)
-  for(let x=550;x<=1000;x+=32) drawTile(ctx, 'fence', x, 40, 28);
-  for(let x=550;x<=1000;x+=32) drawTile(ctx, 'fence', x, 270, 28);
-  // 덤불
-  const bushSpots = [[250,180],[330,340],[600,460],[720,460],[900,340],[950,180],[300,600],[750,600]];
-  bushSpots.forEach(([x,y])=> drawTile(ctx, 'tree-bush', x-14, y-28, 28));
-  // 나무 (초록/주황 섞어서)
-  const treeSpots = [[60,150],[80,420],[380,480],[500,480],[820,120],[850,260],[780,480],[260,60],[40,60],[920,500],[60,540]];
-  treeSpots.forEach(([x,y],i)=> drawTile(ctx, i%3===0 ? 'tree-orange' : 'tree-green', x-16, y-34, 34));
   return c;
 }
 const REST_CHAR_FRAME_SIZE = 64;
@@ -1795,7 +1764,9 @@ function hsvToRgb(h,s,v){
 function drawRestCharacter(ctx, x, y, name, cfg, moving, running, facing){
   const size = REST_CHAR_SIZE;
   const config = cfg || restCharConfig;
-  const img = charWalkImgs[config.gender] || charWalkImgs.man;
+  const genderImgs = charWalkImgs[config.gender] || charWalkImgs.man;
+  const dir = facing==='right' ? 'left' : (facing || 'down');
+  const img = genderImgs[dir] || genderImgs.down;
   if(img.complete && img.naturalWidth>0){
     const speed = running ? 70 : 120;
     const frame = moving ? Math.floor(Date.now()/speed) % MONSTER_FRAME_COUNT : 0;
@@ -1806,7 +1777,7 @@ function drawRestCharacter(ctx, x, y, name, cfg, moving, running, facing){
     recolorPart(restCharTintCtx, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, ranges.pants, config.pantsColor);
     recolorPart(restCharTintCtx, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, ranges.shoes, config.shoesColor);
     ctx.save();
-    if(facing==='left'){ ctx.translate(x+size/2,y-size/2); ctx.scale(-1,1); ctx.drawImage(restCharTintCanvas, 0,0,size,size); }
+    if(facing==='right'){ ctx.translate(x+size/2,y-size/2); ctx.scale(-1,1); ctx.drawImage(restCharTintCanvas, 0,0,size,size); }
     else { ctx.drawImage(restCharTintCanvas, x-size/2, y-size, size, size); }
     ctx.restore();
   } else {
@@ -1876,12 +1847,13 @@ function drawCapIcon(ctx, w, h, color){
 }
 let restInventoryItems = []; // 코스튬은 추후 추가 예정
 const REST_PALETTE = ['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#4dabf7','#748ffc','#e599f7','#f783ac','#ced4da','#495057','#ffffff','#2a2a2a'];
-const charWalkImgs = {
-  man: new Image(),
-  woman: new Image(),
-};
-charWalkImgs.man.src = 'assets/char-walk-man.png';
-charWalkImgs.woman.src = 'assets/char-walk-woman.png';
+const charWalkImgs = { man:{}, woman:{} };
+['man','woman'].forEach(g=>{
+  ['up','left','down'].forEach(dir=>{
+    const img = new Image(); img.src = `assets/char-walk-${g}-${dir}.png`;
+    charWalkImgs[g][dir] = img;
+  });
+});
 function loadRestCharConfig(){
   try{
     const saved = JSON.parse(localStorage.getItem('tb_rest_char')||'null');
@@ -2459,7 +2431,7 @@ const MONSTER_FALLBACK_COLORS = {
   zombie: '#5a9e4a', wraith: '#4a6fa5', fire: '#c9422e', blue: '#2e6fc9',
 };
 function drawDefenseMonster(ctx, x, y, type, scale, hurt){
-  const size = 34 * scale;
+  const size = 44 * scale;
   if(type === 'boss'){
     if(bossImg.complete && bossImg.naturalWidth>0){
       ctx.drawImage(bossImg, x-size/2, y-size/2, size, size);
@@ -2534,6 +2506,12 @@ function drawDefenseBackground(ctx, w, h){
 }
 let mpDefensePrevMonsters = {};
 let mpDefenseDyingList = [];
+function monsterPhaseHash(id){
+  let h = 0;
+  const s = id || 'x';
+  for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) % 1000;
+  return h;
+}
 function mpRenderDefenseMonsters(msg){
   const canvas = document.getElementById('defense-canvas');
   if(!canvas) return;
@@ -2541,8 +2519,8 @@ function mpRenderDefenseMonsters(msg){
   drawDefenseBackground(ctx, canvas.width, canvas.height);
   const laneCount = 5;
   const nowIds = {};
-  (msg.monsters||[]).forEach((m,idx)=>{
-    const lane = idx % laneCount;
+  (msg.monsters||[]).forEach((m)=>{
+    const lane = monsterPhaseHash(m.id) % laneCount;
     const x = 30 + lane * ((canvas.width-60)/(laneCount-1));
     const y = 40 + m.progress * (canvas.height-70);
     const prev = mpDefensePrevMonsters[m.id];
@@ -2572,7 +2550,7 @@ function mpRenderDefenseMonsters(msg){
   if(msg.boss){
     const x = canvas.width/2;
     const y = 50 + msg.boss.progress * (canvas.height-90);
-    drawDefenseMonster(ctx, x, y, 'boss', 1.68);
+    drawDefenseMonster(ctx, x, y, 'boss', 2.0);
     ctx.fillStyle = '#2a0000'; ctx.fillRect(x-40,y-46,80,7);
     ctx.fillStyle = '#ff5468'; ctx.fillRect(x-40,y-46,Math.max(0,80*(msg.boss.hp/msg.boss.maxHp)),7);
   }
