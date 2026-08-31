@@ -45,6 +45,67 @@
   }
   .rest-hint{ position:absolute; right:20px; bottom:16px; font-size:11px; color:var(--dim); background:rgba(10,14,20,0.6); padding:6px 10px; border-radius:6px; }
   .rest-name-tag{ position:absolute; pointer-events:none; font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.8); }
+  .rest-inventory{
+    position:absolute; top:16px; right:16px; width:230px; background:rgba(12,16,24,0.95);
+    border:1px solid var(--line); border-radius:10px; padding:12px; z-index:10;
+  }
+  .rest-inv-title{ font-size:13px; font-weight:900; color:var(--cyan); margin-bottom:8px; }
+  .rest-inv-equip-area{ display:flex; gap:10px; align-items:flex-start; }
+  #rest-inv-preview{ background:#1a2230; border:1px solid var(--line); border-radius:6px; }
+  .rest-equip-slots{ display:flex; flex-direction:column; gap:6px; flex:1; }
+  .rest-equip-slot{
+    height:30px; background:var(--bg2); border:1px dashed var(--line); border-radius:6px;
+    display:flex; align-items:center; justify-content:center; position:relative; font-size:10px; color:var(--dim);
+  }
+  .rest-equip-slot.filled{ border-style:solid; border-color:var(--cyan); }
+  .rest-slot-label{ position:absolute; text-transform:uppercase; letter-spacing:1px; }
+  .rest-inv-divider{ height:1px; background:var(--line); margin:10px 0; }
+  .rest-inv-items{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; max-height:180px; overflow-y:auto; }
+  .rest-inv-item{
+    width:100%; aspect-ratio:1; background:var(--bg2); border:1px solid var(--line); border-radius:6px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;
+  }
+  .rest-inv-item:hover{ border-color:var(--cyan); }
+  .rest-inv-item canvas{ width:80%; height:80%; }
+  .rest-color-popup{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:20;
+    background:rgba(12,16,24,0.98); border:1px solid var(--cyan); border-radius:10px; padding:14px; width:200px;
+  }
+  .rest-color-title{ font-size:12px; font-weight:700; margin-bottom:10px; text-align:center; }
+  .rest-color-palette{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
+  .rest-color-swatch{ width:100%; aspect-ratio:1; border-radius:5px; cursor:pointer; border:2px solid transparent; }
+  .rest-color-swatch:hover{ border-color:#fff; }
+  .rest-color-close{ width:100%; padding:6px; background:var(--bg2); border:1px solid var(--line); border-radius:6px; color:var(--text); cursor:pointer; }
+  .rest-item-ctx-menu{
+    position:absolute; z-index:15; background:rgba(12,16,24,0.98); border:1px solid var(--line); border-radius:6px;
+    padding:4px; font-size:12px;
+  }
+  .rest-item-ctx-menu div{ padding:6px 12px; cursor:pointer; border-radius:4px; }
+  .rest-item-ctx-menu div:hover{ background:var(--bg2); }
+  .rest-charsetup{
+    position:absolute; inset:0; background:rgba(5,7,12,0.85); display:flex; align-items:center; justify-content:center; z-index:30;
+  }
+  .rest-cs-box{
+    background:rgba(15,20,30,0.98); border:1px solid var(--cyan); border-radius:12px; padding:20px 26px;
+    display:flex; flex-direction:column; align-items:center; gap:10px; width:260px;
+  }
+  .rest-cs-title{ font-size:15px; font-weight:900; color:var(--cyan); margin-bottom:4px; }
+  #rest-cs-preview{ background:#1a2230; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; }
+  .rest-cs-row{ display:flex; align-items:center; gap:8px; width:100%; }
+  .rest-cs-label{ width:50px; font-size:12px; color:var(--dim); }
+  .rest-cs-gender{ display:flex; gap:6px; flex:1; }
+  .rest-cs-gender-btn{
+    flex:1; padding:6px 0; background:var(--bg2); border:1px solid var(--line); border-radius:6px; color:var(--text); cursor:pointer; font-size:12px;
+  }
+  .rest-cs-gender-btn.active{ border-color:var(--cyan); color:var(--cyan); background:rgba(61,219,255,0.12); }
+  .rest-cs-swatch{ width:26px; height:26px; border-radius:6px; border:1px solid var(--line); }
+  .rest-cs-palette-btn{
+    flex:1; padding:6px 0; background:var(--bg2); border:1px solid var(--line); border-radius:6px; color:var(--text); cursor:pointer; font-size:11px;
+  }
+  .rest-cs-palette-btn:hover{ border-color:var(--cyan); }
+  .rest-cs-start-btn{
+    width:100%; margin-top:8px; padding:9px 0; background:var(--cyan); border:none; border-radius:8px; color:#03222b; font-weight:900; cursor:pointer; font-size:13px;
+  }
   .screen.active{ display:flex; }
 
   /* ---------- 메인 메뉴 ---------- */
@@ -530,7 +591,7 @@
       <option value="classic5">클래식 (5인)</option>
       <option value="territory">땅따먹기 (4인)</option>
       <option value="defense">침공저지 (4인 협동)</option>
-      <option value="rest">휴식의 땅 (4인)</option>
+      <option value="rest">Rest & Chat (4인)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -734,7 +795,56 @@
     <div class="rest-chat-input-row" id="rest-chat-input-row" style="display:none;">
       <input type="text" id="rest-chat-input" maxlength="120" placeholder="메시지를 입력하고 Enter...">
     </div>
-    <div class="rest-hint">WASD 이동 · Shift 달리기 · Enter 채팅 · Esc 나가기</div>
+    <div class="rest-hint">WASD 이동 · Shift 달리기 · Enter 채팅 · I 인벤토리 · Esc 나가기</div>
+
+    <div class="rest-inventory" id="rest-inventory" style="display:none;">
+      <div class="rest-inv-title">인벤토리</div>
+      <div class="rest-inv-equip-area">
+        <canvas id="rest-inv-preview" width="80" height="110"></canvas>
+        <div class="rest-equip-slots">
+          <div class="rest-equip-slot" data-slot="head" id="rest-slot-head"><span class="rest-slot-label">head</span></div>
+          <div class="rest-equip-slot" data-slot="top" id="rest-slot-top"><span class="rest-slot-label">top</span></div>
+          <div class="rest-equip-slot" data-slot="bottom" id="rest-slot-bottom"><span class="rest-slot-label">bottom</span></div>
+        </div>
+      </div>
+      <div class="rest-inv-divider"></div>
+      <div class="rest-inv-items" id="rest-inv-items"></div>
+    </div>
+    <div class="rest-color-popup" id="rest-color-popup" style="display:none;">
+      <div class="rest-color-title" id="rest-color-title">아이템 색상변경</div>
+      <div class="rest-color-palette" id="rest-color-palette"></div>
+      <button class="rest-color-close" id="rest-color-close">닫기</button>
+    </div>
+
+    <div class="rest-charsetup" id="rest-charsetup" style="display:none;">
+      <div class="rest-cs-box">
+        <div class="rest-cs-title">캐릭터 설정</div>
+        <canvas id="rest-cs-preview" width="100" height="130"></canvas>
+        <div class="rest-cs-row">
+          <span class="rest-cs-label">성별</span>
+          <div class="rest-cs-gender">
+            <button class="rest-cs-gender-btn active" id="rest-cs-gender-man" data-gender="man">남</button>
+            <button class="rest-cs-gender-btn" id="rest-cs-gender-woman" data-gender="woman">여</button>
+          </div>
+        </div>
+        <div class="rest-cs-row">
+          <span class="rest-cs-label">티셔츠</span>
+          <div class="rest-cs-swatch" id="rest-cs-swatch-shirt"></div>
+          <button class="rest-cs-palette-btn" data-target="shirt">팔레트</button>
+        </div>
+        <div class="rest-cs-row">
+          <span class="rest-cs-label">바지</span>
+          <div class="rest-cs-swatch" id="rest-cs-swatch-pants"></div>
+          <button class="rest-cs-palette-btn" data-target="pants">팔레트</button>
+        </div>
+        <div class="rest-cs-row">
+          <span class="rest-cs-label">신발</span>
+          <div class="rest-cs-swatch" id="rest-cs-swatch-shoes"></div>
+          <button class="rest-cs-palette-btn" data-target="shoes">팔레트</button>
+        </div>
+        <button class="rest-cs-start-btn" id="rest-cs-start-btn">시작하기</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1288,7 +1398,8 @@ function mpHandleMessage(msg){
     case 'roomClosed': mpHandleRoomClosed(msg.reason); break;
     case 'restPlayerUpdate':
       if(!mpOthers[msg.id]) mpOthers[msg.id] = { name:msg.name, color: PLAYER_COLORS[Object.keys(mpOthers).length % PLAYER_COLORS.length], alive:true, score:0 };
-      mpRestOthers[msg.id] = { name:msg.name, x:msg.x, y:msg.y, facing:msg.facing, moving:msg.moving, running:msg.running, lastSeen:Date.now() };
+      mpRestOthers[msg.id] = { name:msg.name, x:msg.x, y:msg.y, facing:msg.facing, moving:msg.moving, running:msg.running, lastSeen:Date.now(),
+        cfg: { gender: msg.gender||'man', shirtColor: msg.shirtColor||'#4a9adf', pantsColor: msg.pantsColor||'#5a4a3a', shoesColor: msg.shoesColor||'#3a2a1a' } };
       break;
     case 'restPlayerLeft': delete mpRestOthers[msg.id]; break;
     case 'garbage': mpIncomingGarbage(msg.amount, msg.from); break;
@@ -1369,7 +1480,7 @@ function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territo
 function mpModeLabel(mode){
   if(mode === 'territory') return '땅따먹기';
   if(mode === 'defense') return '침공저지';
-  if(mode === 'rest') return '휴식의 땅';
+  if(mode === 'rest') return 'RC';
   if(mode === 'classic2') return '클래식(2인)';
   return '클래식(5인)';
 }
@@ -1479,6 +1590,12 @@ function mpEnterRestMode(){
   mpRestMe = { x: REST_MAP_W/2, y: REST_MAP_H/2, facing: 'down', moving: false, running: false };
   document.getElementById('rest-chat-log').innerHTML = '';
   document.getElementById('rest-chat-input-row').style.display = 'none';
+  document.getElementById('rest-inventory').style.display = 'none';
+  if(!restCharConfigSaved){
+    mpRestShowCharSetup();
+  } else {
+    document.getElementById('rest-charsetup').style.display = 'none';
+  }
   const wrap = document.getElementById('rest-wrap');
   wrap.classList.add('fading');
   showScreen('screen-rest');
@@ -1503,6 +1620,7 @@ function mpRestExit(){
   showScreen('screen-menu');
 }
 function mpRestKeyDown(e){
+  if(document.getElementById('rest-charsetup').style.display !== 'none') return;
   if(e.key === 'Escape'){ mpRestExit(); return; }
   if(e.key === 'Enter'){
     const row = document.getElementById('rest-chat-input-row');
@@ -1518,6 +1636,7 @@ function mpRestKeyDown(e){
     return;
   }
   if(document.getElementById('rest-chat-input-row').style.display !== 'none') return; // 채팅 중엔 이동 무시
+  if(e.key==='i'||e.key==='I'){ mpRestToggleInventory(); return; }
   if(e.key==='w'||e.key==='W') mpRestKeys.w = true;
   if(e.key==='a'||e.key==='A') mpRestKeys.a = true;
   if(e.key==='s'||e.key==='S') mpRestKeys.s = true;
@@ -1533,7 +1652,7 @@ function mpRestKeyUp(e){
 }
 function mpRestSendPosition(){
   if(!mpActive || mpRoomMode!=='rest') return;
-  mpSend({type:'restMove', x:mpRestMe.x, y:mpRestMe.y, facing:mpRestMe.facing, moving:mpRestMe.moving, running:mpRestMe.running});
+  mpSend({type:'restMove', x:mpRestMe.x, y:mpRestMe.y, facing:mpRestMe.facing, moving:mpRestMe.moving, running:mpRestMe.running, gender:restCharConfig.gender, shirtColor:restCharConfig.shirtColor, pantsColor:restCharConfig.pantsColor, shoesColor:restCharConfig.shoesColor});
 }
 function mpRestLoop(){
   if(!mpActive || mpRoomMode!=='rest'){ return; }
@@ -1612,30 +1731,93 @@ const REST_CHAR_FRAME_SIZE = 64;
 const restCharTintCanvas = document.createElement('canvas');
 restCharTintCanvas.width = REST_CHAR_FRAME_SIZE; restCharTintCanvas.height = REST_CHAR_FRAME_SIZE;
 const restCharTintCtx = restCharTintCanvas.getContext('2d');
-function drawRestCharacter(ctx, x, y, name, color, moving, running, facing){
+function rgbToHsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  if(d!==0){
+    if(max===r) h = ((g-b)/d)%6;
+    else if(max===g) h = (b-r)/d+2;
+    else h = (r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  return [h, max===0?0:d/max, max];
+}
+function hexToRgbArr(hex){
+  const h = hex.replace('#','');
+  return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+}
+function hueInRange(h, lo, hi){
+  if(lo<=hi) return h>=lo && h<=hi;
+  return h>=lo || h<=hi; // 0/360 경계를 넘는 범위(예: 빨강 계열)
+}
+// 성별별 상의/하의/신발 영역의 실제 색상 범위(HSV)를 미리 측정해서, 해당 범위에 드는 픽셀만 재염색.
+// 피부색은 채도/명도 범위가 달라 자연히 제외됨.
+const REST_PART_RANGES = {
+  man: {
+    shirt:{ hueLo:200, hueHi:320, satMin:0.15, valLo:0.05, valHi:0.9 },
+    pants:{ hueLo:28, hueHi:52, satMin:0.45, valLo:0.25, valHi:0.85 },
+    shoes:{ hueLo:14, hueHi:27, satMin:0.55, valLo:0.1, valHi:0.5 },
+  },
+  woman: {
+    shirt:{ hueLo:335, hueHi:20, satMin:0.3, valLo:0.1, valHi:0.95 },
+    pants:{ hueLo:30, hueHi:75, satMin:0.06, valLo:0.55, valHi:0.85 },
+    shoes:{ hueLo:140, hueHi:235, satMin:0.03, valLo:0.2, valHi:0.65 },
+  },
+};
+function recolorPart(ctx, w, h, range, targetHex){
+  const imgData = ctx.getImageData(0,0,w,h);
+  const d = imgData.data;
+  const [tr,tg,tb] = hexToRgbArr(targetHex);
+  const [th,ts] = rgbToHsv(tr,tg,tb);
+  for(let i=0;i<d.length;i+=4){
+    const a = d[i+3]; if(a===0) continue;
+    const r=d[i], g=d[i+1], b=d[i+2];
+    const [ph,ps,pv] = rgbToHsv(r,g,b);
+    if(ps < range.satMin) continue;
+    if(pv < range.valLo || pv > range.valHi) continue;
+    if(!hueInRange(ph, range.hueLo, range.hueHi)) continue;
+    // 원본의 명도(밝기)는 유지한 채 색상만 목표 색으로 교체 (음영 보존)
+    const [nr,ng,nb] = hsvToRgb(th, ts, pv);
+    d[i]=nr; d[i+1]=ng; d[i+2]=nb;
+  }
+  ctx.putImageData(imgData,0,0);
+}
+function hsvToRgb(h,s,v){
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;}
+  else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+  return [(r+m)*255,(g+m)*255,(b+m)*255];
+}
+function drawRestCharacter(ctx, x, y, name, cfg, moving, running, facing){
   const size = REST_CHAR_SIZE;
-  if(monsterWalkImg.complete && monsterWalkImg.naturalWidth>0){
+  const config = cfg || restCharConfig;
+  const img = charWalkImgs[config.gender] || charWalkImgs.man;
+  if(img.complete && img.naturalWidth>0){
     const speed = running ? 70 : 120;
     const frame = moving ? Math.floor(Date.now()/speed) % MONSTER_FRAME_COUNT : 0;
     restCharTintCtx.clearRect(0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
-    restCharTintCtx.drawImage(monsterWalkImg, frame*REST_CHAR_FRAME_SIZE, 0, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, 0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
-    restCharTintCtx.globalCompositeOperation = 'source-atop';
-    restCharTintCtx.fillStyle = color;
-    restCharTintCtx.fillRect(0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
-    restCharTintCtx.globalCompositeOperation = 'source-over';
+    restCharTintCtx.drawImage(img, frame*REST_CHAR_FRAME_SIZE, 0, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, 0,0,REST_CHAR_FRAME_SIZE,REST_CHAR_FRAME_SIZE);
+    const ranges = REST_PART_RANGES[config.gender] || REST_PART_RANGES.man;
+    recolorPart(restCharTintCtx, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, ranges.shirt, config.shirtColor);
+    recolorPart(restCharTintCtx, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, ranges.pants, config.pantsColor);
+    recolorPart(restCharTintCtx, REST_CHAR_FRAME_SIZE, REST_CHAR_FRAME_SIZE, ranges.shoes, config.shoesColor);
     ctx.save();
     if(facing==='left'){ ctx.translate(x+size/2,y-size/2); ctx.scale(-1,1); ctx.drawImage(restCharTintCanvas, 0,0,size,size); }
     else { ctx.drawImage(restCharTintCanvas, x-size/2, y-size, size, size); }
     ctx.restore();
   } else {
-    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x,y-size/2,size/2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#3ddbff'; ctx.beginPath(); ctx.arc(x,y-size/2,size/2,0,Math.PI*2); ctx.fill();
   }
-  ctx.fillStyle = '#fff';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
-  ctx.fillText(name, x, y-size-6);
-  ctx.shadowBlur = 0;
+  if(name){
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+    ctx.fillText(name, x, y-size+6);
+    ctx.shadowBlur = 0;
+  }
 }
 function mpRestRender(){
   const canvas = document.getElementById('rest-canvas');
@@ -1647,10 +1829,9 @@ function mpRestRender(){
   for(const id in mpRestOthers){
     const o = mpRestOthers[id];
     if(now - o.lastSeen > 8000) continue; // 오래 소식없으면 표시 제외
-    const info = mpOthers[id];
-    drawRestCharacter(ctx, o.x, o.y, o.name, (info&&info.color)||'#3ddbff', o.moving, o.running, o.facing);
+    drawRestCharacter(ctx, o.x, o.y, o.name, o.cfg, o.moving, o.running, o.facing);
   }
-  drawRestCharacter(ctx, mpRestMe.x, mpRestMe.y, (getNickname()||'나')+' (나)', '#3ddbff', mpRestMe.moving, mpRestMe.running, mpRestMe.facing);
+  drawRestCharacter(ctx, mpRestMe.x, mpRestMe.y, (getNickname()||'나')+' (나)', restCharConfig, mpRestMe.moving, mpRestMe.running, mpRestMe.facing);
 }
 function appendRestChatLine(name, text, color){
   const log = document.getElementById('rest-chat-log');
@@ -1659,6 +1840,198 @@ function appendRestChatLine(name, text, color){
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 }
+
+// ---------- 인벤토리 (I키) ----------
+function drawShirtIcon(ctx, w, h, color){
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(w*0.3,h*0.15); ctx.lineTo(w*0.1,h*0.35); ctx.lineTo(w*0.25,h*0.48);
+  ctx.lineTo(w*0.3,h*0.38); ctx.lineTo(w*0.3,h*0.85); ctx.lineTo(w*0.7,h*0.85);
+  ctx.lineTo(w*0.7,h*0.38); ctx.lineTo(w*0.75,h*0.48); ctx.lineTo(w*0.9,h*0.35);
+  ctx.lineTo(w*0.7,h*0.15); ctx.lineTo(w*0.6,h*0.22); ctx.lineTo(w*0.4,h*0.22); ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1; ctx.stroke();
+}
+function drawPantsIcon(ctx, w, h, color){
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = color;
+  ctx.fillRect(w*0.28,h*0.15,w*0.44,h*0.28);
+  ctx.fillRect(w*0.28,h*0.42,w*0.18,h*0.43);
+  ctx.fillRect(w*0.54,h*0.42,w*0.18,h*0.43);
+  ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1;
+  ctx.strokeRect(w*0.28,h*0.15,w*0.44,h*0.28);
+}
+function drawCapIcon(ctx, w, h, color){
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(w*0.5,h*0.45,w*0.28,Math.PI,0); ctx.fill();
+  ctx.fillRect(w*0.22,h*0.45,w*0.56,h*0.12);
+  ctx.fillRect(w*0.5,h*0.5,w*0.35,h*0.08);
+}
+let restInventoryItems = []; // 코스튬은 추후 추가 예정
+const REST_PALETTE = ['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#4dabf7','#748ffc','#e599f7','#f783ac','#ced4da','#495057','#ffffff','#2a2a2a'];
+const charWalkImgs = {
+  man: new Image(),
+  woman: new Image(),
+};
+charWalkImgs.man.src = 'assets/char-walk-man.png';
+charWalkImgs.woman.src = 'assets/char-walk-woman.png';
+function loadRestCharConfig(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('tb_rest_char')||'null');
+    if(saved && saved.gender) return saved;
+  }catch(e){}
+  return null;
+}
+function saveRestCharConfig(cfg){
+  try{ localStorage.setItem('tb_rest_char', JSON.stringify(cfg)); }catch(e){}
+}
+let restCharConfig = loadRestCharConfig() || { gender:'man', shirtColor:'#4a9adf', pantsColor:'#5a4a3a', shoesColor:'#3a2a1a' };
+let restCharConfigSaved = !!loadRestCharConfig();
+function mpRestToggleInventory(){
+  const panel = document.getElementById('rest-inventory');
+  const show = panel.style.display === 'none';
+  panel.style.display = show ? 'block' : 'none';
+  if(show) mpRestRenderInventory();
+}
+function mpRestRenderInventory(){
+  const grid = document.getElementById('rest-inv-items');
+  grid.innerHTML = '';
+  restInventoryItems.filter(i=>!i.equipped).forEach(item=>{
+    const cell = document.createElement('div');
+    cell.className = 'rest-inv-item';
+    cell.title = item.name;
+    const canvas = document.createElement('canvas'); canvas.width=40; canvas.height=40;
+    item.icon(canvas.getContext('2d'), 40, 40, item.color);
+    cell.appendChild(canvas);
+    cell.addEventListener('dblclick', ()=> mpRestEquipItem(item.id));
+    cell.addEventListener('contextmenu', (e)=>{ e.preventDefault(); mpRestShowItemMenu(e, item.id); });
+    grid.appendChild(cell);
+  });
+  ['head','top','bottom'].forEach(slot=>{
+    const el = document.getElementById('rest-slot-'+slot);
+    const equippedItem = restInventoryItems.find(i=>i.slot===slot && i.equipped);
+    el.innerHTML = '';
+    if(equippedItem){
+      el.classList.add('filled');
+      const canvas = document.createElement('canvas'); canvas.width=24; canvas.height=24;
+      equippedItem.icon(canvas.getContext('2d'), 24,24, equippedItem.color);
+      el.appendChild(canvas);
+      el.ondblclick = ()=> mpRestUnequip(slot);
+    } else {
+      el.classList.remove('filled');
+      el.innerHTML = `<span class="rest-slot-label">${slot}</span>`;
+      el.ondblclick = null;
+    }
+  });
+  mpRestRenderPreview();
+}
+function mpRestEquipItem(id){
+  const item = restInventoryItems.find(i=>i.id===id);
+  if(!item) return;
+  restInventoryItems.forEach(i=>{ if(i.slot===item.slot) i.equipped=false; });
+  item.equipped = true;
+  mpRestRenderInventory();
+}
+function mpRestUnequip(slot){
+  const item = restInventoryItems.find(i=>i.slot===slot && i.equipped);
+  if(item) item.equipped = false;
+  mpRestRenderInventory();
+}
+function mpRestRenderPreview(){
+  const canvas = document.getElementById('rest-inv-preview');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawRestCharacter(ctx, canvas.width/2, canvas.height-10, '', restCharConfig, false, false, 'down');
+}
+function mpRestShowItemMenu(e, itemId){
+  const old = document.getElementById('rest-item-ctx-menu'); if(old) old.remove();
+  const menu = document.createElement('div');
+  menu.className = 'rest-item-ctx-menu';
+  menu.id = 'rest-item-ctx-menu';
+  const wrapRect = document.getElementById('rest-wrap').getBoundingClientRect();
+  menu.style.left = (e.clientX - wrapRect.left)+'px';
+  menu.style.top = (e.clientY - wrapRect.top)+'px';
+  menu.innerHTML = '<div id="rest-ctx-color">색상변경</div>';
+  document.getElementById('rest-wrap').appendChild(menu);
+  document.getElementById('rest-ctx-color').addEventListener('click', ()=>{
+    menu.remove();
+    mpRestShowColorPopup(itemId);
+  });
+  setTimeout(()=>{
+    document.addEventListener('click', function closeMenu(){ const m=document.getElementById('rest-item-ctx-menu'); if(m) m.remove(); document.removeEventListener('click', closeMenu); }, {once:true});
+  },0);
+}
+function mpRestShowColorPopup(itemId){
+  const item = restInventoryItems.find(i=>i.id===itemId);
+  if(!item) return;
+  const popup = document.getElementById('rest-color-popup');
+  document.getElementById('rest-color-title').textContent = item.name + ' 색상변경';
+  const palette = document.getElementById('rest-color-palette');
+  palette.innerHTML = '';
+  REST_PALETTE.forEach(c=>{
+    const sw = document.createElement('div');
+    sw.className = 'rest-color-swatch';
+    sw.style.background = c;
+    sw.addEventListener('click', ()=>{
+      item.color = c;
+      popup.style.display = 'none';
+      mpRestRenderInventory();
+    });
+    palette.appendChild(sw);
+  });
+  popup.style.display = 'block';
+}
+document.getElementById('rest-color-close').addEventListener('click', ()=>{ document.getElementById('rest-color-popup').style.display='none'; });
+
+// ---------- 캐릭터 최초 설정 모달 ----------
+function mpRestUpdateCharSetupUI(){
+  document.getElementById('rest-cs-swatch-shirt').style.background = restCharConfig.shirtColor;
+  document.getElementById('rest-cs-swatch-pants').style.background = restCharConfig.pantsColor;
+  document.getElementById('rest-cs-swatch-shoes').style.background = restCharConfig.shoesColor;
+  document.getElementById('rest-cs-gender-man').classList.toggle('active', restCharConfig.gender==='man');
+  document.getElementById('rest-cs-gender-woman').classList.toggle('active', restCharConfig.gender==='woman');
+  const canvas = document.getElementById('rest-cs-preview');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawRestCharacter(ctx, canvas.width/2, canvas.height-15, '', restCharConfig, false, false, 'down');
+}
+function mpRestShowCharPalette(target){
+  const popup = document.getElementById('rest-color-popup');
+  const label = target==='shirt' ? '티셔츠' : (target==='pants' ? '바지' : '신발');
+  document.getElementById('rest-color-title').textContent = label + ' 색상 선택';
+  const palette = document.getElementById('rest-color-palette');
+  palette.innerHTML = '';
+  REST_PALETTE.forEach(c=>{
+    const sw = document.createElement('div');
+    sw.className = 'rest-color-swatch';
+    sw.style.background = c;
+    sw.addEventListener('click', ()=>{
+      if(target==='shirt') restCharConfig.shirtColor = c;
+      if(target==='pants') restCharConfig.pantsColor = c;
+      if(target==='shoes') restCharConfig.shoesColor = c;
+      popup.style.display = 'none';
+      mpRestUpdateCharSetupUI();
+    });
+    palette.appendChild(sw);
+  });
+  popup.style.display = 'block';
+}
+function mpRestShowCharSetup(){
+  document.getElementById('rest-charsetup').style.display = 'flex';
+  mpRestUpdateCharSetupUI();
+}
+document.getElementById('rest-cs-gender-man').addEventListener('click', ()=>{ restCharConfig.gender='man'; mpRestUpdateCharSetupUI(); });
+document.getElementById('rest-cs-gender-woman').addEventListener('click', ()=>{ restCharConfig.gender='woman'; mpRestUpdateCharSetupUI(); });
+document.querySelectorAll('.rest-cs-palette-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> mpRestShowCharPalette(btn.dataset.target));
+});
+document.getElementById('rest-cs-start-btn').addEventListener('click', ()=>{
+  saveRestCharConfig(restCharConfig);
+  restCharConfigSaved = true;
+  document.getElementById('rest-charsetup').style.display = 'none';
+});
 
 function mpEnterWaitingRoom(){
   mpIsSpectator = false;
