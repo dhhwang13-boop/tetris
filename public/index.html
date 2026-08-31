@@ -323,14 +323,14 @@
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:5;
     display:flex; flex-direction:column; align-items:center; gap:8px;
   }
-  .defense-license{ font-size:9px; color:var(--dim); text-align:center; max-width:220px; }
+  .defense-license{ font-size:9px; color:var(--dim); text-align:center; white-space:nowrap; opacity:.35; }
   .defense-hp-row{ display:flex; align-items:center; gap:6px; width:100%; }
   .defense-hp-num{ font-size:14px; font-weight:900; color:var(--bad); width:28px; text-align:right; }
   .defense-hp-max{ font-size:11px; color:var(--dim); }
   .defense-hp-track{ flex:1; height:14px; background:var(--bg2); border-radius:7px; overflow:hidden; border:1px solid var(--line); }
   .defense-hp-fill{ height:100%; background:linear-gradient(90deg,#ff5468,#ff8a4a); transition:width .3s; }
   .defense-boards{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; width:100%; }
-  .defense-boards .opp-slot{ min-height:auto; padding:4px; }
+  .defense-boards .opp-slot{ min-height:190px; padding:4px; }
   .defense-boards .opp-name{ font-size:9px; }
   .territory-timer{ font-size:28px; font-weight:900; color:var(--yellow); letter-spacing:1px; }
   #territory-canvas{ border:1px solid var(--line); border-radius:6px; }
@@ -1564,7 +1564,7 @@ function mpRenderLobby(msg){
     document.getElementById('mp-ready-box').style.display = 'none';
     document.getElementById('defense-col').style.display = 'flex';
     document.getElementById('defense-center-overlay').style.display = 'flex';
-    document.getElementById('defense-round-label').textContent = '대기중';
+    document.getElementById('defense-round-label').textContent = '';
     document.getElementById('defense-timer').textContent = '--:--';
     document.getElementById('defense-hp-num').textContent = 100;
     document.getElementById('defense-hp-fill').style.width = '100%';
@@ -1828,12 +1828,23 @@ function mpRenderDefenseSelfBoard(){
 }
 const bossImg = new Image(); bossImg.src = 'assets/boss.png';
 const monsterWalkImg = new Image(); monsterWalkImg.src = 'assets/monster-walk.png';
+const monsterHurtImg = new Image(); monsterHurtImg.src = 'assets/monster-hurt.png';
+const MONSTER_HURT_FRAME_COUNT = 6;
 const MONSTER_FRAME_SIZE = 64, MONSTER_FRAME_COUNT = 9;
 const monsterTintCanvas = document.createElement('canvas');
 monsterTintCanvas.width = MONSTER_FRAME_SIZE; monsterTintCanvas.height = MONSTER_FRAME_SIZE;
 const monsterTintCtx = monsterTintCanvas.getContext('2d');
-function drawDefenseMonster(ctx, x, y, type, scale){
-  const size = 26 * scale;
+const MONSTER_TINT_COLORS = {
+  zombie: 'rgba(70,190,90,0.55)',
+  wraith: 'rgba(90,70,190,0.6)',
+  fire: 'rgba(230,60,40,0.65)',
+  blue: 'rgba(40,120,230,0.65)',
+};
+const MONSTER_FALLBACK_COLORS = {
+  zombie: '#5a9e4a', wraith: '#4a6fa5', fire: '#c9422e', blue: '#2e6fc9',
+};
+function drawDefenseMonster(ctx, x, y, type, scale, hurt){
+  const size = 34 * scale;
   if(type === 'boss'){
     if(bossImg.complete && bossImg.naturalWidth>0){
       ctx.drawImage(bossImg, x-size/2, y-size/2, size, size);
@@ -1842,19 +1853,26 @@ function drawDefenseMonster(ctx, x, y, type, scale){
     }
     return;
   }
-  if(monsterWalkImg.complete && monsterWalkImg.naturalWidth>0){
-    const frame = Math.floor(Date.now()/120) % MONSTER_FRAME_COUNT;
+  const sheet = hurt ? monsterHurtImg : monsterWalkImg;
+  if(sheet.complete && sheet.naturalWidth>0){
+    const frame = hurt ? (MONSTER_HURT_FRAME_COUNT-1) : Math.floor(Date.now()/120) % MONSTER_FRAME_COUNT;
     monsterTintCtx.clearRect(0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
-    monsterTintCtx.drawImage(monsterWalkImg, frame*MONSTER_FRAME_SIZE, 0, MONSTER_FRAME_SIZE, MONSTER_FRAME_SIZE, 0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
+    monsterTintCtx.drawImage(sheet, frame*MONSTER_FRAME_SIZE, 0, MONSTER_FRAME_SIZE, MONSTER_FRAME_SIZE, 0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
     monsterTintCtx.globalCompositeOperation = 'source-atop';
-    monsterTintCtx.fillStyle = type==='wraith' ? 'rgba(90,70,190,0.6)' : 'rgba(70,190,90,0.55)';
+    monsterTintCtx.fillStyle = hurt ? 'rgba(255,255,255,0.75)' : (MONSTER_TINT_COLORS[type] || MONSTER_TINT_COLORS.zombie);
     monsterTintCtx.fillRect(0,0,MONSTER_FRAME_SIZE,MONSTER_FRAME_SIZE);
     monsterTintCtx.globalCompositeOperation = 'source-over';
     ctx.drawImage(monsterTintCanvas, x-size/2, y-size/2, size, size);
   } else {
-    const bodyColor = type==='wraith' ? '#4a6fa5' : '#5a9e4a';
+    const bodyColor = MONSTER_FALLBACK_COLORS[type] || '#5a9e4a';
     ctx.fillStyle = bodyColor; ctx.beginPath(); ctx.arc(x,y,size/2,0,Math.PI*2); ctx.fill();
   }
+}
+function drawMonsterHpBar(ctx, x, y, hp, maxHp){
+  const w = 26, h = 4;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x-w/2-1, y-1, w+2, h+2);
+  ctx.fillStyle = '#3a0000'; ctx.fillRect(x-w/2, y, w, h);
+  ctx.fillStyle = '#ff5468'; ctx.fillRect(x-w/2, y, Math.max(0, w*(hp/maxHp)), h);
 }
 let defenseBgCache = null;
 function drawDefenseBackground(ctx, w, h){
@@ -1899,22 +1917,47 @@ function drawDefenseBackground(ctx, w, h){
   }
   ctx.drawImage(defenseBgCache, 0, 0);
 }
+let mpDefensePrevMonsters = {};
+let mpDefenseDyingList = [];
 function mpRenderDefenseMonsters(msg){
   const canvas = document.getElementById('defense-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
   drawDefenseBackground(ctx, canvas.width, canvas.height);
   const laneCount = 5;
+  const nowIds = {};
   (msg.monsters||[]).forEach((m,idx)=>{
     const lane = idx % laneCount;
     const x = 30 + lane * ((canvas.width-60)/(laneCount-1));
     const y = 40 + m.progress * (canvas.height-70);
-    drawDefenseMonster(ctx, x, y, m.type, 1);
+    const prev = mpDefensePrevMonsters[m.id];
+    const justHit = !!(prev && m.hp!=null && prev.hp!=null && m.hp < prev.hp);
+    drawDefenseMonster(ctx, x, y, m.type, 1, justHit);
+    if(m.maxHp>0) drawMonsterHpBar(ctx, x, y-24, m.hp, m.maxHp);
+    nowIds[m.id] = { type:m.type, x, y, hp:m.hp };
+  });
+  // 사라진(처치된) 몬스터는 마지막 위치에서 서서히 페이드아웃
+  for(const id in mpDefensePrevMonsters){
+    if(!nowIds[id]){
+      const p = mpDefensePrevMonsters[id];
+      mpDefenseDyingList.push({ type:p.type, x:p.x, y:p.y, startTime: Date.now() });
+    }
+  }
+  mpDefensePrevMonsters = nowIds;
+  const now = Date.now();
+  mpDefenseDyingList = mpDefenseDyingList.filter(dm=>{
+    const elapsed = now - dm.startTime;
+    if(elapsed > 450) return false;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - elapsed/450);
+    drawDefenseMonster(ctx, dm.x, dm.y, dm.type, 1, false);
+    ctx.restore();
+    return true;
   });
   if(msg.boss){
     const x = canvas.width/2;
     const y = 50 + msg.boss.progress * (canvas.height-90);
-    drawDefenseMonster(ctx, x, y, 'boss', 2.2);
+    drawDefenseMonster(ctx, x, y, 'boss', 1.68);
     ctx.fillStyle = '#2a0000'; ctx.fillRect(x-40,y-46,80,7);
     ctx.fillStyle = '#ff5468'; ctx.fillRect(x-40,y-46,Math.max(0,80*(msg.boss.hp/msg.boss.maxHp)),7);
   }
