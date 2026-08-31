@@ -1611,6 +1611,7 @@ function mpEnterRestMode(){
   mpRestStars = {};
   mpRestStarPopup = null;
   mpRestMe = { x: REST_MAP_W/2, y: FIRE_Y + 100, facing: 'up', moving: false, running: false };
+  mpRestLastFrameTime = 0;
   restCricketAudio.currentTime = 0; restCricketAudio.play().catch(()=>{});
   restFireAudio.currentTime = 0; restFireAudio.play().catch(()=>{});
   document.getElementById('rest-chat-log').innerHTML = '';
@@ -1687,8 +1688,16 @@ function mpRestSendPosition(){
   if(!mpActive || mpRoomMode!=='rest') return;
   mpSend({type:'restMove', x:mpRestMe.x, y:mpRestMe.y, facing:mpRestMe.facing, moving:mpRestMe.moving, running:mpRestMe.running, gender:restCharConfig.gender, shirtColor:restCharConfig.shirtColor, pantsColor:restCharConfig.pantsColor, shoesColor:restCharConfig.shoesColor});
 }
-function mpRestLoop(){
+let mpRestLastFrameTime = 0;
+function mpRestLoop(ts){
   if(!mpActive || mpRoomMode!=='rest'){ return; }
+  if(!mpRestLastFrameTime) mpRestLastFrameTime = ts || Date.now();
+  const now = ts || Date.now();
+  let dtMs = now - mpRestLastFrameTime;
+  mpRestLastFrameTime = now;
+  if(dtMs <= 0) dtMs = 16.7;
+  if(dtMs > 80) dtMs = 80; // 렉/탭전환 등으로 프레임이 몰릴 때 한 번에 크게 이동(순간이동처럼 보임)하는 것 방지
+  const dtScale = dtMs / 16.7; // 60fps 기준 배율
   const distToFire = Math.hypot(mpRestMe.x-FIRE_X, mpRestMe.y-FIRE_Y);
   restFireAudio.volume = Math.max(0, REST_FIRE_SOUND_MAX_VOLUME * (1 - distToFire/REST_FIRE_SOUND_RANGE));
   const chatOpen = document.getElementById('rest-chat-input-row').style.display !== 'none' || document.getElementById('rest-esc-menu').style.display !== 'none';
@@ -1704,7 +1713,7 @@ function mpRestLoop(){
   mpRestMe.running = moving && mpRestKeys.shift;
   if(moving){
     const len = Math.sqrt(dx*dx+dy*dy);
-    const speed = mpRestMe.running ? REST_RUN_SPEED : REST_WALK_SPEED;
+    const speed = (mpRestMe.running ? REST_RUN_SPEED : REST_WALK_SPEED) * dtScale;
     const trunkHalfW = 20*TREE_SCALE, trunkTop = TREE_BASE_Y-50*TREE_SCALE, trunkBottom = TREE_BASE_Y+6;
     function hitsTrunk(px,py){ return px > TREE_X-trunkHalfW && px < TREE_X+trunkHalfW && py > trunkTop && py < trunkBottom; }
     function hitsFire(px,py){ const fx=px-FIRE_X, fy=py-FIRE_Y; return Math.sqrt(fx*fx+fy*fy) < FIRE_COLLIDE_RADIUS; }
@@ -2014,18 +2023,22 @@ function mpRestRender(){
       mpRestStarPopup = null;
     }
   }
-  // 밤 조명: 모닥불 주변만 은은하게 밝고, 나머지는 어둡게 (마지막에 전체 위에 덧씌워서 캐릭터 밝기도 자연히 영향받음)
-  // 전체를 거의 새까맣게 (밤, 모닥불에서 조금만 벗어나도 거의 안 보이도록)
-  ctx.fillStyle = 'rgba(0,0,0,0.965)';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  // 모닥불 위치에서만 은은한 주황빛이 가산혼합으로 스며나오도록 (2초 주기로 주황/연주황/붉은주황 순환)
-  const glowBase = [[255,170,50],[255,205,140],[255,140,40]][fireColorPhase()];
+  // 밤 조명: 모닥불 근처는 원래 색이 잘 보이도록 하고(알파 낮음), 멀어질수록 거의 새까맣게
   const glowCx = FIRE_X, glowCy = FIRE_Y - 30;
+  const darkGrad = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 165);
+  darkGrad.addColorStop(0, 'rgba(0,0,0,0.08)');
+  darkGrad.addColorStop(0.35, 'rgba(0,0,0,0.4)');
+  darkGrad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+  darkGrad.addColorStop(1, 'rgba(0,0,0,0.965)');
+  ctx.fillStyle = darkGrad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // 그 위에 은은한 주황빛 색감만 가산혼합으로 살짝 얹기 (2초 주기로 주황/연주황/붉은주황 순환)
+  const glowBase = [[255,170,50],[255,205,140],[255,140,40]][fireColorPhase()];
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const glow = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 165);
-  glow.addColorStop(0, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.6)`);
-  glow.addColorStop(0.5, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.26)`);
+  glow.addColorStop(0, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.32)`);
+  glow.addColorStop(0.5, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.14)`);
   glow.addColorStop(1, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0)`);
   ctx.fillStyle = glow;
   ctx.fillRect(0,0,canvas.width,canvas.height);
