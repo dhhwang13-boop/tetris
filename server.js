@@ -12,7 +12,7 @@ const REST_MAP_W = 1400, REST_MAP_H = 760;
 const REST_STAR_MAX = 2;
 const REST_STAR_SPAWN_CHANCE = 0.0006;
 const REST_STAR_PICKUP_RADIUS = 40;
-const REST_TREE_AVOID = { x: REST_MAP_W/2, y: REST_MAP_H/2 - 40, radius: 220 };
+const REST_FIRE_LIGHT = { x: REST_MAP_W/2, y: REST_MAP_H/2 - 40 + 65 - 30, radius: 120 };
 
 // ---------- 봇용 실제 테트리스 엔진 (서버에서 직접 판단하며 플레이) ----------
 const BOT_COLS = 10, BOT_ROWS = 20;
@@ -322,12 +322,10 @@ wss.on('connection', (ws, req) => {
       broadcast(room, { type: 'restPlayerUpdate', id: ws.playerId, name: me.name, x: msg.x, y: msg.y, facing: msg.facing, moving: !!msg.moving, running: !!msg.running, gender: msg.gender, shirtColor: msg.shirtColor, pantsColor: msg.pantsColor, shoesColor: msg.shoesColor }, ws.playerId);
       if (!room.restStars) room.restStars = new Map();
       if (room.restStars.size < REST_STAR_MAX && Math.random() < REST_STAR_SPAWN_CHANCE) {
-        let sx, sy, tries = 0;
-        do {
-          sx = 50 + Math.random() * (REST_MAP_W - 100);
-          sy = 50 + Math.random() * (REST_MAP_H - 100);
-          tries++;
-        } while (Math.hypot(sx - REST_TREE_AVOID.x, sy - REST_TREE_AVOID.y) < REST_TREE_AVOID.radius && tries < 20);
+        const ang = Math.random() * Math.PI * 2;
+        const dist = Math.random() * REST_FIRE_LIGHT.radius;
+        const sx = REST_FIRE_LIGHT.x + Math.cos(ang) * dist;
+        const sy = REST_FIRE_LIGHT.y + Math.sin(ang) * dist;
         const starId = uid();
         room.restStars.set(starId, { x: sx, y: sy });
         broadcastAll(room, { type: 'restStarSpawn', id: starId, x: sx, y: sy });
