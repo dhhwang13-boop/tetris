@@ -1599,12 +1599,20 @@ const REST_MAP_W = 1400, REST_MAP_H = 760;
 const REST_CHAR_SIZE = 68; // 침공저지 몬스터(34) 대비 2배
 const REST_WALK_SPEED = 1.6, REST_RUN_SPEED = 3.0;
 
+const restCricketAudio = new Audio('assets/audio/crickets.mp3');
+restCricketAudio.loop = true; restCricketAudio.volume = 0.02;
+const restFireAudio = new Audio('assets/audio/campfire-crackle.mp3');
+restFireAudio.loop = true; restFireAudio.volume = 0;
+const REST_FIRE_SOUND_MAX_VOLUME = 0.04;
+const REST_FIRE_SOUND_RANGE = 420;
 function mpEnterRestMode(){
   mpActive = true; mpRoomMode = 'rest'; mpMatchStarted = true;
   mpRestOthers = {};
   mpRestStars = {};
   mpRestStarPopup = null;
   mpRestMe = { x: REST_MAP_W/2, y: FIRE_Y + 100, facing: 'up', moving: false, running: false };
+  restCricketAudio.currentTime = 0; restCricketAudio.play().catch(()=>{});
+  restFireAudio.currentTime = 0; restFireAudio.play().catch(()=>{});
   document.getElementById('rest-chat-log').innerHTML = '';
   document.getElementById('rest-chat-input-row').style.display = 'none';
   document.getElementById('rest-inventory').style.display = 'none';
@@ -1634,6 +1642,8 @@ function mpRestExit(){
   clearInterval(mpRestSendTimer);
   document.removeEventListener('keydown', mpRestKeyDown);
   document.removeEventListener('keyup', mpRestKeyUp);
+  restCricketAudio.pause();
+  restFireAudio.pause();
   mpDisconnect();
   showScreen('screen-menu');
 }
@@ -1679,6 +1689,8 @@ function mpRestSendPosition(){
 }
 function mpRestLoop(){
   if(!mpActive || mpRoomMode!=='rest'){ return; }
+  const distToFire = Math.hypot(mpRestMe.x-FIRE_X, mpRestMe.y-FIRE_Y);
+  restFireAudio.volume = Math.max(0, REST_FIRE_SOUND_MAX_VOLUME * (1 - distToFire/REST_FIRE_SOUND_RANGE));
   const chatOpen = document.getElementById('rest-chat-input-row').style.display !== 'none' || document.getElementById('rest-esc-menu').style.display !== 'none';
   let dx=0, dy=0;
   if(!chatOpen){
@@ -1693,26 +1705,15 @@ function mpRestLoop(){
   if(moving){
     const len = Math.sqrt(dx*dx+dy*dy);
     const speed = mpRestMe.running ? REST_RUN_SPEED : REST_WALK_SPEED;
-    let nx = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_W-REST_CHAR_SIZE/2, mpRestMe.x + (dx/len)*speed));
-    let ny = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_H-REST_CHAR_SIZE/2, mpRestMe.y + (dy/len)*speed));
-    const fdx = nx-FIRE_X, fdy = ny-FIRE_Y;
-    if(Math.sqrt(fdx*fdx+fdy*fdy) < FIRE_COLLIDE_RADIUS){
-      // 모닥불 밑동과는 겹칠 수 없음 - 밀어내기
-      const ang = Math.atan2(fdy,fdx);
-      nx = FIRE_X + Math.cos(ang)*FIRE_COLLIDE_RADIUS;
-      ny = FIRE_Y + Math.sin(ang)*FIRE_COLLIDE_RADIUS;
-    }
-    // 나무 기둥 위에도 캐릭터가 있을 수 없음 (기둥 폭 만큼 사각형 충돌)
     const trunkHalfW = 20*TREE_SCALE, trunkTop = TREE_BASE_Y-50*TREE_SCALE, trunkBottom = TREE_BASE_Y+6;
-    if(nx > TREE_X-trunkHalfW && nx < TREE_X+trunkHalfW && ny > trunkTop && ny < trunkBottom){
-      const distToTop = Math.abs(ny-trunkTop), distToBottom = Math.abs(ny-trunkBottom);
-      const distToLeft = Math.abs(nx-(TREE_X-trunkHalfW)), distToRight = Math.abs(nx-(TREE_X+trunkHalfW));
-      const minDist = Math.min(distToTop, distToBottom, distToLeft, distToRight);
-      if(minDist===distToTop) ny = trunkTop;
-      else if(minDist===distToBottom) ny = trunkBottom;
-      else if(minDist===distToLeft) nx = TREE_X-trunkHalfW;
-      else nx = TREE_X+trunkHalfW;
-    }
+    function hitsTrunk(px,py){ return px > TREE_X-trunkHalfW && px < TREE_X+trunkHalfW && py > trunkTop && py < trunkBottom; }
+    function hitsFire(px,py){ const fx=px-FIRE_X, fy=py-FIRE_Y; return Math.sqrt(fx*fx+fy*fy) < FIRE_COLLIDE_RADIUS; }
+    let nx = mpRestMe.x, ny = mpRestMe.y;
+    // X, Y를 각각 따로 이동+충돌검사 (동시에 처리하면 엉뚱한 방향으로 튕겨나가는 문제가 생김)
+    const tryX = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_W-REST_CHAR_SIZE/2, mpRestMe.x + (dx/len)*speed));
+    if(!hitsTrunk(tryX, ny) && !hitsFire(tryX, ny)) nx = tryX;
+    const tryY = Math.max(REST_CHAR_SIZE/2, Math.min(REST_MAP_H-REST_CHAR_SIZE/2, mpRestMe.y + (dy/len)*speed));
+    if(!hitsTrunk(nx, tryY) && !hitsFire(nx, tryY)) ny = tryY;
     mpRestMe.x = nx; mpRestMe.y = ny;
     if(dy<0) mpRestMe.facing = 'up'; else if(dy>0) mpRestMe.facing = 'down';
     else if(dx<0) mpRestMe.facing = 'left'; else if(dx>0) mpRestMe.facing = 'right';
@@ -1721,7 +1722,7 @@ function mpRestLoop(){
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
 const villageImgs = {};
-['grass-plain-v2','grass-flower-v2','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire-static','tree-var1','tree-var2','tree-var3'].forEach(name=>{
+['grass-plain-v2','grass-flower-v2','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire-v3','tree-var1','tree-var2','tree-var3'].forEach(name=>{
   const img = new Image(); img.src = 'assets/village/'+name+'.png';
   villageImgs[name] = img;
 });
@@ -1731,7 +1732,7 @@ const TREE_BASE_Y = REST_MAP_H/2 - 40;
 const TREE_SORT_Y = TREE_BASE_Y - 45*TREE_SCALE; // 이 y보다 위(작은 값)에 있으면 나무 뒤로 감
 const FIRE_X = TREE_X;
 const FIRE_Y = TREE_BASE_Y + 65;
-const FIRE_SCALE = 0.24;
+const FIRE_SCALE = 0.22;
 const FIRE_COLLIDE_RADIUS = 30;
 function drawTile(ctx, name, x, y, size){
   const img = villageImgs[name];
@@ -1943,14 +1944,14 @@ function drawRestCharacter(ctx, x, y, name, cfg, moving, running, facing){
     ctx.shadowBlur = 0;
   }
 }
-const FIRE_IMG_W = 325, FIRE_IMG_H = 380;
+const FIRE_IMG_W = 360, FIRE_IMG_H = 650;
 const fireTintCanvas = document.createElement('canvas');
 fireTintCanvas.width = FIRE_IMG_W; fireTintCanvas.height = FIRE_IMG_H;
 const fireTintCtx = fireTintCanvas.getContext('2d');
 const FIRE_COLOR_CYCLE = ['rgba(255,140,20,0.3)', 'rgba(255,190,120,0.25)', 'rgba(255,70,20,0.35)'];
 function fireColorPhase(){ return Math.floor(Date.now()/2000) % FIRE_COLOR_CYCLE.length; }
 function drawCampfire(ctx, x, y){
-  const img = villageImgs['campfire-static'];
+  const img = villageImgs['campfire-v3'];
   if(!img || !img.complete || img.naturalWidth===0) return;
   const w = FIRE_IMG_W*FIRE_SCALE, h = FIRE_IMG_H*FIRE_SCALE;
   fireTintCtx.clearRect(0,0,FIRE_IMG_W,FIRE_IMG_H);
@@ -2018,13 +2019,13 @@ function mpRestRender(){
   ctx.fillStyle = 'rgba(0,0,0,0.965)';
   ctx.fillRect(0,0,canvas.width,canvas.height);
   // 모닥불 위치에서만 은은한 주황빛이 가산혼합으로 스며나오도록 (2초 주기로 주황/연주황/붉은주황 순환)
-  const glowBase = [[255,140,40],[255,190,130],[255,90,30]][fireColorPhase()];
+  const glowBase = [[255,170,50],[255,205,140],[255,140,40]][fireColorPhase()];
   const glowCx = FIRE_X, glowCy = FIRE_Y - 30;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const glow = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 130);
-  glow.addColorStop(0, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.4)`);
-  glow.addColorStop(0.5, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.16)`);
+  const glow = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 165);
+  glow.addColorStop(0, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.6)`);
+  glow.addColorStop(0.5, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.26)`);
   glow.addColorStop(1, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0)`);
   ctx.fillStyle = glow;
   ctx.fillRect(0,0,canvas.width,canvas.height);
