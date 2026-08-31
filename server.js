@@ -12,7 +12,7 @@ const REST_MAP_W = 1400, REST_MAP_H = 760;
 const REST_STAR_MAX = 2;
 const REST_STAR_SPAWN_CHANCE = 0.0006;
 const REST_STAR_PICKUP_RADIUS = 40;
-const REST_FIRE_LIGHT = { x: REST_MAP_W/2, y: REST_MAP_H/2 - 40 + 65 - 30, radius: 120 };
+const REST_FIRE_LIGHT = { x: REST_MAP_W/2, y: REST_MAP_H/2 - 40 + 65 - 30, radius: 150 };
 
 // ---------- 봇용 실제 테트리스 엔진 (서버에서 직접 판단하며 플레이) ----------
 const BOT_COLS = 10, BOT_ROWS = 20;
