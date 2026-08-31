@@ -1720,10 +1720,9 @@ function mpRestLoop(){
   mpRestRender();
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
-const ASSET_VERSION = 'v20260831b';
 const villageImgs = {};
 ['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire','tree-var1','tree-var2','tree-var3'].forEach(name=>{
-  const img = new Image(); img.src = 'assets/village/'+name+'.png?'+ASSET_VERSION;
+  const img = new Image(); img.src = 'assets/village/'+name+'.png';
   villageImgs[name] = img;
 });
 const TREE_SCALE = 3.2;
@@ -1824,26 +1823,28 @@ function mpRestBuildBackground(){
     const S = TREE_SCALE;
     ctx.drawImage(villageImgs['tree-big-trunk'], TREE_X-64*S, TREE_BASE_Y-53*S, 128*S, 53*S);
   }
-  // 주변 숲 나무들 - 나무/모닥불 주변 공터(CLEARING_RADIUS) 바깥에만 불규칙하게 듬성듬성 배치
+  // 주변 숲 나무들 - 나무/모닥불 주변 공터(CLEARING_RADIUS) 바깥에는 나무가 광활하게 펼쳐지도록 배치
   const forestTreeNames = ['tree-var1','tree-var2','tree-var3'];
   const CLEARING_RADIUS = 300;
   const forestSpots = [];
-  for(let i=0;i<28;i++){
+  for(let i=0;i<110;i++){
     let sx, sy, tries=0;
     do{
-      sx = 60 + rnd()*(REST_MAP_W-120);
-      sy = 60 + rnd()*(REST_MAP_H-120);
+      sx = 40 + rnd()*(REST_MAP_W-80);
+      sy = 40 + rnd()*(REST_MAP_H-80);
       tries++;
     } while(Math.hypot(sx-TREE_X, sy-TREE_BASE_Y) < CLEARING_RADIUS && tries<30);
     forestSpots.push([sx,sy]);
   }
+  // y좌표(화면상 아래쪽일수록 앞쪽) 기준으로 정렬해서 그려야, 나무끼리 겹쳐도 앞뒤가 자연스럽게 맞음 (안 그러면 나무가 붕 떠보임)
+  forestSpots.sort((a,b)=>a[1]-b[1]);
   let lastTreeIdx = -1;
   forestSpots.forEach(([sx,sy],i)=>{
     let pick = Math.floor(rnd()*forestTreeNames.length);
     if(pick===lastTreeIdx) pick = (pick+1)%forestTreeNames.length;
     lastTreeIdx = pick;
     const name = forestTreeNames[pick];
-    const scale = 1.3 + rnd()*0.9;
+    const scale = 1.1 + rnd()*0.9;
     const w = 128*scale, h = 128*scale;
     drawTile(ctx, name, sx-w/2, sy-h, w);
   });
@@ -2003,10 +2004,13 @@ function mpRestRender(){
     }
   }
   // 밤 조명: 모닥불 주변만 은은하게 밝고, 나머지는 어둡게 (마지막에 전체 위에 덧씌워서 캐릭터 밝기도 자연히 영향받음)
-  const grad = ctx.createRadialGradient(FIRE_X, FIRE_Y, 8, FIRE_X, FIRE_Y, 200);
+  const grad = ctx.createRadialGradient(FIRE_X, FIRE_Y, 8, FIRE_X, FIRE_Y, 850);
   grad.addColorStop(0, 'rgba(10,8,4,0.05)');
-  grad.addColorStop(0.4, 'rgba(8,8,14,0.45)');
-  grad.addColorStop(1, 'rgba(4,4,10,0.88)');
+  grad.addColorStop(0.12, 'rgba(8,8,14,0.25)');
+  grad.addColorStop(0.28, 'rgba(6,6,12,0.5)');
+  grad.addColorStop(0.5, 'rgba(5,5,11,0.72)');
+  grad.addColorStop(0.75, 'rgba(4,4,10,0.86)');
+  grad.addColorStop(1, 'rgba(2,2,6,0.95)');
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,canvas.width,canvas.height);
 }
@@ -2051,7 +2055,7 @@ const REST_PALETTE = ['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#4dabf7','#748ffc
 const charWalkImgs = { man:{}, woman:{} };
 ['man','woman'].forEach(g=>{
   ['up','left','down'].forEach(dir=>{
-    const img = new Image(); img.src = `assets/char-walk-${g}-${dir}.png?`+ASSET_VERSION;
+    const img = new Image(); img.src = `assets/char-walk-${g}-${dir}.png`;
     charWalkImgs[g][dir] = img;
   });
 });
@@ -2617,9 +2621,9 @@ function mpRenderDefenseSelfBoard(){
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ if(eng.board[r][c]){ ctx.fillStyle = '#3ddbff'; ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2); } }
   const scoreEl = document.getElementById('defense-self-score'); if(scoreEl) scoreEl.textContent = eng.score;
 }
-const bossImg = new Image(); bossImg.src = 'assets/boss.png?'+ASSET_VERSION;
-const monsterWalkImg = new Image(); monsterWalkImg.src = 'assets/monster-walk.png?'+ASSET_VERSION;
-const monsterHurtImg = new Image(); monsterHurtImg.src = 'assets/monster-hurt.png?'+ASSET_VERSION;
+const bossImg = new Image(); bossImg.src = 'assets/boss.png';
+const monsterWalkImg = new Image(); monsterWalkImg.src = 'assets/monster-walk.png';
+const monsterHurtImg = new Image(); monsterHurtImg.src = 'assets/monster-hurt.png';
 const MONSTER_HURT_FRAME_COUNT = 6;
 const MONSTER_FRAME_SIZE = 64, MONSTER_FRAME_COUNT = 9;
 const monsterTintCanvas = document.createElement('canvas');
