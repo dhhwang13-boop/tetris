@@ -68,7 +68,7 @@
   .rest-inv-item:hover{ border-color:var(--cyan); }
   .rest-inv-item canvas{ width:80%; height:80%; }
   .rest-color-popup{
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:20;
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:40;
     background:rgba(12,16,24,0.98); border:1px solid var(--cyan); border-radius:10px; padding:14px; width:200px;
   }
   .rest-color-title{ font-size:12px; font-weight:700; margin-bottom:10px; text-align:center; }
@@ -98,11 +98,8 @@
     flex:1; padding:6px 0; background:var(--bg2); border:1px solid var(--line); border-radius:6px; color:var(--text); cursor:pointer; font-size:12px;
   }
   .rest-cs-gender-btn.active{ border-color:var(--cyan); color:var(--cyan); background:rgba(61,219,255,0.12); }
-  .rest-cs-swatch{ width:26px; height:26px; border-radius:6px; border:1px solid var(--line); }
-  .rest-cs-palette-btn{
-    flex:1; padding:6px 0; background:var(--bg2); border:1px solid var(--line); border-radius:6px; color:var(--text); cursor:pointer; font-size:11px;
-  }
-  .rest-cs-palette-btn:hover{ border-color:var(--cyan); }
+  .rest-cs-swatch{ flex:1; height:34px; border-radius:6px; border:1px solid var(--line); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:11px; color:rgba(0,0,0,0.55); font-weight:700; }
+  .rest-cs-swatch:hover{ border-color:var(--cyan); }
   .rest-cs-start-btn{
     width:100%; margin-top:8px; padding:9px 0; background:var(--cyan); border:none; border-radius:8px; color:#03222b; font-weight:900; cursor:pointer; font-size:13px;
   }
@@ -829,18 +826,15 @@
         </div>
         <div class="rest-cs-row">
           <span class="rest-cs-label">티셔츠</span>
-          <div class="rest-cs-swatch" id="rest-cs-swatch-shirt"></div>
-          <button class="rest-cs-palette-btn" data-target="shirt">팔레트</button>
+          <div class="rest-cs-swatch" id="rest-cs-swatch-shirt" data-target="shirt">색상 선택</div>
         </div>
         <div class="rest-cs-row">
           <span class="rest-cs-label">바지</span>
-          <div class="rest-cs-swatch" id="rest-cs-swatch-pants"></div>
-          <button class="rest-cs-palette-btn" data-target="pants">팔레트</button>
+          <div class="rest-cs-swatch" id="rest-cs-swatch-pants" data-target="pants">색상 선택</div>
         </div>
         <div class="rest-cs-row">
           <span class="rest-cs-label">신발</span>
-          <div class="rest-cs-swatch" id="rest-cs-swatch-shoes"></div>
-          <button class="rest-cs-palette-btn" data-target="shoes">팔레트</button>
+          <div class="rest-cs-swatch" id="rest-cs-swatch-shoes" data-target="shoes">색상 선택</div>
         </div>
         <button class="rest-cs-start-btn" id="rest-cs-start-btn">시작하기</button>
       </div>
@@ -1580,6 +1574,7 @@ let mpRestKeys = { w:false, a:false, s:false, d:false, shift:false };
 let mpRestLoopId = null;
 let mpRestSendTimer = null;
 let mpRestBgCache = null;
+let mpRestBgCacheReady = false;
 const REST_MAP_W = 900, REST_MAP_H = 560;
 const REST_CHAR_SIZE = 68; // 침공저지 몬스터(34) 대비 2배
 const REST_WALK_SPEED = 1.6, REST_RUN_SPEED = 3.0;
@@ -1678,12 +1673,25 @@ function mpRestLoop(){
   mpRestRender();
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
+const villageImgs = {};
+['grass-plain','grass-flower','tree-green','tree-orange','tree-bush','dirt-patch','fence'].forEach(name=>{
+  const img = new Image(); img.src = 'assets/village/'+name+'.png';
+  villageImgs[name] = img;
+});
+function drawTile(ctx, name, x, y, size){
+  const img = villageImgs[name];
+  if(img && img.complete && img.naturalWidth>0) ctx.drawImage(img, x, y, size, size);
+}
 function mpRestBuildBackground(){
   const c = document.createElement('canvas'); c.width = REST_MAP_W; c.height = REST_MAP_H;
   const ctx = c.getContext('2d');
   let seed = 7;
   function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
-  ctx.fillStyle = '#3a6b34'; ctx.fillRect(0,0,REST_MAP_W,REST_MAP_H);
+  // 잔디 바닥을 실제 타일로 깔기
+  const TS = 32;
+  for(let y=0;y<REST_MAP_H;y+=TS) for(let x=0;x<REST_MAP_W;x+=TS){
+    drawTile(ctx, rnd()<0.12 ? 'grass-flower' : 'grass-plain', x, y, TS);
+  }
   // 강
   ctx.fillStyle = '#3d78b8';
   ctx.beginPath();
@@ -1698,10 +1706,9 @@ function mpRestBuildBackground(){
   for(let r=0;r<3;r++) for(let col=0;col<4;col++){
     ctx.fillRect(560+col*36, 60+r*30, 30, 6);
   }
-  // 길
-  ctx.fillStyle = '#c9b183';
-  ctx.fillRect(420,0,60,REST_MAP_H);
-  ctx.fillRect(0,300,REST_MAP_W,50);
+  // 길 (흙길 타일로)
+  for(let y=0;y<REST_MAP_H;y+=TS) drawTile(ctx, 'dirt-patch', 420, y, TS), drawTile(ctx, 'dirt-patch', 452, y, TS);
+  for(let x=0;x<REST_MAP_W;x+=TS) drawTile(ctx, 'dirt-patch', x, 300, TS), drawTile(ctx, 'dirt-patch', x, 332, TS);
   // 건물
   function building(x,y,w,h,color){
     ctx.fillStyle = color; ctx.fillRect(x,y,w,h);
@@ -1711,20 +1718,15 @@ function mpRestBuildBackground(){
   building(560,340,90,70,'#c96a4a');
   building(700,360,80,60,'#b9a26a');
   building(140,60,80,60,'#8a9ac9');
-  // 수풀
-  for(let i=0;i<24;i++){
-    const x = rnd()*REST_MAP_W, y = rnd()*REST_MAP_H;
-    ctx.fillStyle = '#4a8a3a';
-    ctx.beginPath(); ctx.ellipse(x,y,10+rnd()*6,7+rnd()*4,0,0,Math.PI*2); ctx.fill();
-  }
-  // 나무
-  function tree(x,y){
-    ctx.fillStyle = '#5a3a20'; ctx.fillRect(x-3,y,6,20);
-    ctx.fillStyle = '#3d7a30'; ctx.beginPath(); ctx.arc(x,y-8,16,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#4a9a3a'; ctx.beginPath(); ctx.arc(x-6,y-14,10,0,Math.PI*2); ctx.fill();
-  }
-  const treeSpots = [[60,150],[80,420],[380,480],[500,480],[820,120],[850,260],[780,480],[260,60],[40,60]];
-  treeSpots.forEach(([x,y])=>tree(x,y));
+  // 울타리 (밭/마을 경계 장식)
+  for(let x=550;x<=1000;x+=32) drawTile(ctx, 'fence', x, 40, 28);
+  for(let x=550;x<=1000;x+=32) drawTile(ctx, 'fence', x, 270, 28);
+  // 덤불
+  const bushSpots = [[250,180],[330,340],[600,460],[720,460],[900,340],[950,180],[300,600],[750,600]];
+  bushSpots.forEach(([x,y])=> drawTile(ctx, 'tree-bush', x-14, y-28, 28));
+  // 나무 (초록/주황 섞어서)
+  const treeSpots = [[60,150],[80,420],[380,480],[500,480],[820,120],[850,260],[780,480],[260,60],[40,60],[920,500],[60,540]];
+  treeSpots.forEach(([x,y],i)=> drawTile(ctx, i%3===0 ? 'tree-orange' : 'tree-green', x-16, y-34, 34));
   return c;
 }
 const REST_CHAR_FRAME_SIZE = 64;
@@ -1823,7 +1825,10 @@ function mpRestRender(){
   const canvas = document.getElementById('rest-canvas');
   if(!canvas) return;
   const ctx = canvas.getContext('2d');
-  if(!mpRestBgCache) mpRestBgCache = mpRestBuildBackground();
+  if(!mpRestBgCache || !mpRestBgCacheReady){
+    mpRestBgCache = mpRestBuildBackground();
+    mpRestBgCacheReady = Object.values(villageImgs).every(img=>img.complete && img.naturalWidth>0);
+  }
   ctx.drawImage(mpRestBgCache, 0, 0);
   const now = Date.now();
   for(const id in mpRestOthers){
@@ -2024,8 +2029,8 @@ function mpRestShowCharSetup(){
 }
 document.getElementById('rest-cs-gender-man').addEventListener('click', ()=>{ restCharConfig.gender='man'; mpRestUpdateCharSetupUI(); });
 document.getElementById('rest-cs-gender-woman').addEventListener('click', ()=>{ restCharConfig.gender='woman'; mpRestUpdateCharSetupUI(); });
-document.querySelectorAll('.rest-cs-palette-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=> mpRestShowCharPalette(btn.dataset.target));
+document.querySelectorAll('.rest-cs-swatch').forEach(sw=>{
+  sw.addEventListener('click', ()=> mpRestShowCharPalette(sw.dataset.target));
 });
 document.getElementById('rest-cs-start-btn').addEventListener('click', ()=>{
   saveRestCharConfig(restCharConfig);
