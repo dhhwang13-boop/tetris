@@ -595,10 +595,11 @@ const DEFENSE_HP_PER_PLAYER = 30;
 const DEFENSE_ROUND_GAP_MS = 5000;
 
 function defenseMonsterPool(round){
-  const pool = ['zombie', 'wraith'];
-  if (round >= 2) pool.push('fire');
-  if (round >= 3) pool.push('blue');
-  return pool;
+  // 라운드가 오를수록 화마(fire)/청귀(blue) 비중이 점진적으로 커지도록 가중치 배열로 구성
+  if (round === 1) return ['zombie','zombie','zombie','wraith','wraith','wraith'];
+  if (round === 2) return ['zombie','zombie','zombie','wraith','wraith','wraith','fire'];
+  if (round === 3) return ['zombie','zombie','wraith','wraith','fire','fire','blue'];
+  return ['zombie','wraith','fire','fire','fire','blue','blue']; // round 4+
 }
 function defenseRoundDuration(round){
   if (round === 3) return 90000;
