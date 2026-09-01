@@ -590,7 +590,6 @@
       <option value="classic5">클래식 (5인)</option>
       <option value="territory">땅따먹기 (4인)</option>
       <option value="defense">침공저지 (4인 협동)</option>
-      <option value="rest">Rest & Chat (4인)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -1419,7 +1418,7 @@ function mpHandleMessage(msg){
       if(mpRoomMode === 'rest'){
         const info = mpOthers[msg.id];
         appendRestChatLine(msg.name, msg.text, info ? info.color : null);
-        mpRestShowBubble(msg.id, msg.text);
+        mpRestShowBubble(msg.id, msg.name, msg.text);
       } else {
         const info = mpOthers[msg.id]; appendChatLine(msg.name, msg.text, info ? info.color : null);
         if(msg.isEmoji) mpShowSpeechBubble(msg.id, msg.text);
@@ -1499,6 +1498,7 @@ function mpModeLabel(mode){
 }
 function mpRenderRoomList(rooms){
   const listEl = document.getElementById('mp-room-list');
+  rooms = (rooms||[]).filter(r => r.mode !== 'rest'); // Rest & Chat은 완성 전까지 메인 게임에서 숨김 (별도 테스트 파일에서만 사용)
   if(!rooms || rooms.length===0){ listEl.innerHTML = '<div class="mp-room-empty">열려있는 방이 없어요.</div>'; return; }
   listEl.innerHTML = '';
   rooms.forEach(r=>{
@@ -1596,7 +1596,7 @@ let mpRestSendTimer = null;
 let mpRestBgCache = null;
 let mpRestBgCacheReady = false;
 const REST_MAP_W = 1400, REST_MAP_H = 760;
-const REST_CHAR_SIZE = 68; // 침공저지 몬스터(34) 대비 2배
+const REST_CHAR_SIZE = 80;
 const REST_WALK_SPEED = 1.6, REST_RUN_SPEED = 3.0;
 
 const restCricketAudio = new Audio('assets/audio/crickets.mp3');
@@ -1696,7 +1696,7 @@ function mpRestLoop(ts){
   let dtMs = now - mpRestLastFrameTime;
   mpRestLastFrameTime = now;
   if(dtMs <= 0) dtMs = 16.7;
-  if(dtMs > 80) dtMs = 80; // 렉/탭전환 등으로 프레임이 몰릴 때 한 번에 크게 이동(순간이동처럼 보임)하는 것 방지
+  if(dtMs > 50) dtMs = 50; // 렉/탭전환 등으로 프레임이 몰릴 때 한 번에 크게 이동(순간이동처럼 보임)하는 것 방지
   const dtScale = dtMs / 16.7; // 60fps 기준 배율
   const distToFire = Math.hypot(mpRestMe.x-FIRE_X, mpRestMe.y-FIRE_Y);
   restFireAudio.volume = Math.max(0, REST_FIRE_SOUND_MAX_VOLUME * (1 - distToFire/REST_FIRE_SOUND_RANGE));
@@ -1731,7 +1731,7 @@ function mpRestLoop(ts){
   mpRestLoopId = requestAnimationFrame(mpRestLoop);
 }
 const villageImgs = {};
-['grass-plain-v2','grass-flower-v2','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire-v3','tree-var1','tree-var2','tree-var3'].forEach(name=>{
+['grass-plain-v2','grass-flower-v2','tree-green','tree-orange','tree-bush','dirt-patch','fence','tree-big-trunk','tree-big-canopy','campfire-v4','tree-var1','tree-var2','tree-var3'].forEach(name=>{
   const img = new Image(); img.src = 'assets/village/'+name+'.png';
   villageImgs[name] = img;
 });
@@ -1739,10 +1739,10 @@ const TREE_SCALE = 3.2;
 const TREE_X = REST_MAP_W/2;
 const TREE_BASE_Y = REST_MAP_H/2 - 40;
 const TREE_SORT_Y = TREE_BASE_Y - 45*TREE_SCALE; // 이 y보다 위(작은 값)에 있으면 나무 뒤로 감
-const FIRE_X = TREE_X;
-const FIRE_Y = TREE_BASE_Y + 65;
-const FIRE_SCALE = 0.22;
-const FIRE_COLLIDE_RADIUS = 30;
+const FIRE_X = TREE_X - 20;
+const FIRE_Y = TREE_BASE_Y + 85;
+const FIRE_SCALE = 0.18;
+const FIRE_COLLIDE_RADIUS = 34;
 function drawTile(ctx, name, x, y, size){
   const img = villageImgs[name];
   if(img && img.complete && img.naturalWidth>0) ctx.drawImage(img, x, y, size, size);
@@ -1776,10 +1776,10 @@ function mpRestShowStarPopup(star){
   mpRestStarPopup = { x: star ? star.x : mpRestMe.x, y: star ? star.y : mpRestMe.y, start: Date.now() };
 }
 let mpRestBubbles = {};
-function mpRestShowBubble(id, text){
-  const trimmed = (text||'').slice(0,40);
+function mpRestShowBubble(id, name, text){
+  const combined = `[${name}: ${text||''}]`.slice(0,48);
   const lines = [];
-  for(let i=0;i<trimmed.length;i+=8) lines.push(trimmed.slice(i,i+8));
+  for(let i=0;i<combined.length;i+=8) lines.push(combined.slice(i,i+8));
   mpRestBubbles[id] = { lines, start: Date.now() };
 }
 function drawRestBubble(ctx, x, y, lines){
@@ -1788,7 +1788,7 @@ function drawRestBubble(ctx, x, y, lines){
   let maxW = 0;
   lines.forEach(l=>{ const w = ctx.measureText(l).width; if(w>maxW) maxW = w; });
   const boxW = maxW + padX*2, boxH = lines.length*lineH + padY*2;
-  const boxX = x - boxW/2, boxY = y - boxH - 12;
+  const boxX = x - boxW/2, boxY = y - boxH - 4;
   ctx.fillStyle = 'rgba(255,255,255,0.94)';
   ctx.strokeStyle = 'rgba(0,0,0,0.25)';
   ctx.lineWidth = 1.5;
@@ -1944,31 +1944,28 @@ function drawRestCharacter(ctx, x, y, name, cfg, moving, running, facing){
   } else {
     ctx.fillStyle = '#3ddbff'; ctx.beginPath(); ctx.arc(x,y-size/2,size/2,0,Math.PI*2); ctx.fill();
   }
-  if(name){
-    ctx.fillStyle = '#fff';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
-    ctx.fillText(name, x, y-size+6);
-    ctx.shadowBlur = 0;
-  }
 }
-const FIRE_IMG_W = 360, FIRE_IMG_H = 650;
+const FIRE_IMG_W = 439, FIRE_IMG_H = 558;
+const FIRE_FLAME_CUTOFF_Y = 385; // 이 y좌표보다 위쪽(불꽃)만 색상을 순환시킴, 장작/돌은 고정
 const fireTintCanvas = document.createElement('canvas');
 fireTintCanvas.width = FIRE_IMG_W; fireTintCanvas.height = FIRE_IMG_H;
 const fireTintCtx = fireTintCanvas.getContext('2d');
 const FIRE_COLOR_CYCLE = ['rgba(255,140,20,0.3)', 'rgba(255,190,120,0.25)', 'rgba(255,70,20,0.35)'];
 function fireColorPhase(){ return Math.floor(Date.now()/2000) % FIRE_COLOR_CYCLE.length; }
 function drawCampfire(ctx, x, y){
-  const img = villageImgs['campfire-v3'];
+  const img = villageImgs['campfire-v4'];
   if(!img || !img.complete || img.naturalWidth===0) return;
   const w = FIRE_IMG_W*FIRE_SCALE, h = FIRE_IMG_H*FIRE_SCALE;
   fireTintCtx.clearRect(0,0,FIRE_IMG_W,FIRE_IMG_H);
   fireTintCtx.drawImage(img, 0, 0);
+  fireTintCtx.save();
+  fireTintCtx.beginPath();
+  fireTintCtx.rect(0,0,FIRE_IMG_W,FIRE_FLAME_CUTOFF_Y);
+  fireTintCtx.clip();
   fireTintCtx.globalCompositeOperation = 'source-atop';
   fireTintCtx.fillStyle = FIRE_COLOR_CYCLE[fireColorPhase()];
-  fireTintCtx.fillRect(0,0,FIRE_IMG_W,FIRE_IMG_H);
-  fireTintCtx.globalCompositeOperation = 'source-over';
+  fireTintCtx.fillRect(0,0,FIRE_IMG_W,FIRE_FLAME_CUTOFF_Y);
+  fireTintCtx.restore();
   ctx.drawImage(fireTintCanvas, x-w/2, y-h, w, h);
 }
 function drawTreeCanopy(ctx){
@@ -2002,7 +1999,7 @@ function mpRestRender(){
     else {
       drawRestCharacter(ctx, item.x, item.y, item.name, item.cfg, item.moving, item.running, item.facing);
       const bubble = mpRestBubbles[item.id];
-      if(bubble) drawRestBubble(ctx, item.x, item.y-REST_CHAR_SIZE-4, bubble.lines);
+      if(bubble) drawRestBubble(ctx, item.x, item.y-REST_CHAR_SIZE+8, bubble.lines);
     }
   });
   // 모닥불은 캐릭터보다 나중에 그려서 항상 앞쪽(불꽃 쪽)에 살짝 겹치도록
@@ -2025,20 +2022,20 @@ function mpRestRender(){
   }
   // 밤 조명: 모닥불 근처는 원래 색이 잘 보이도록 하고(알파 낮음), 멀어질수록 거의 새까맣게
   const glowCx = FIRE_X, glowCy = FIRE_Y - 30;
-  const darkGrad = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 165);
-  darkGrad.addColorStop(0, 'rgba(0,0,0,0.08)');
-  darkGrad.addColorStop(0.35, 'rgba(0,0,0,0.4)');
-  darkGrad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
-  darkGrad.addColorStop(1, 'rgba(0,0,0,0.965)');
+  const darkGrad = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 190);
+  darkGrad.addColorStop(0, 'rgba(0,0,0,0.04)');
+  darkGrad.addColorStop(0.45, 'rgba(0,0,0,0.18)');
+  darkGrad.addColorStop(0.75, 'rgba(0,0,0,0.55)');
+  darkGrad.addColorStop(1, 'rgba(0,0,0,0.93)');
   ctx.fillStyle = darkGrad;
   ctx.fillRect(0,0,canvas.width,canvas.height);
   // 그 위에 은은한 주황빛 색감만 가산혼합으로 살짝 얹기 (2초 주기로 주황/연주황/붉은주황 순환)
   const glowBase = [[255,170,50],[255,205,140],[255,140,40]][fireColorPhase()];
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const glow = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 165);
-  glow.addColorStop(0, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.32)`);
-  glow.addColorStop(0.5, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.14)`);
+  const glow = ctx.createRadialGradient(glowCx, glowCy, 4, glowCx, glowCy, 190);
+  glow.addColorStop(0, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.48)`);
+  glow.addColorStop(0.5, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0.22)`);
   glow.addColorStop(1, `rgba(${glowBase[0]},${glowBase[1]},${glowBase[2]},0)`);
   ctx.fillStyle = glow;
   ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -3020,7 +3017,7 @@ function appendChatLine(name, text, color){
 }
 function mpSendChat(text, isEmoji){
   if(!text) return;
-  if(mpRoomMode === 'rest'){ appendRestChatLine('나', text, '#3ddbff'); mpRestShowBubble(mpPlayerId, text); }
+  if(mpRoomMode === 'rest'){ appendRestChatLine('나', text, '#3ddbff'); mpRestShowBubble(mpPlayerId, getNickname()||'나', text); }
   else { appendChatLine('나', text, 'var(--cyan)'); }
   mpSend({type:'chat', text, isEmoji: !!isEmoji});
 }
