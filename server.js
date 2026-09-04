@@ -284,7 +284,9 @@ wss.on('connection', (ws, req) => {
       const password = isPrivate ? String(msg.password || '').slice(0, 16) : null;
       if (isPrivate && !password) { send(ws, { type: 'error', message: '비공개 방은 코드를 설정해야 해요.' }); return; }
       const title = String(msg.roomTitle || '').trim().slice(0, 20) || DEFAULT_ROOM_TITLES[Math.floor(Math.random() * DEFAULT_ROOM_TITLES.length)];
-      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : (msg.mode === 'defense' ? 'defense' : (msg.mode === 'rest' ? 'rest' : 'classic5')));
+      // '휴식의 땅(rest)'는 정식 오픈 전까지 비활성화 - 클라이언트가 rest를 요청해도 서버가 받아주지 않고 classic5로 처리됨.
+      // 나중에 다시 열 때는 이 줄만 원래대로 되돌리면 됨: (msg.mode === 'defense' ? 'defense' : (msg.mode === 'rest' ? 'rest' : 'classic5'))
+      const mode = msg.mode === 'classic2' ? 'classic2' : (msg.mode === 'territory' ? 'territory' : (msg.mode === 'defense' ? 'defense' : 'classic5'));
       const room = { id, title, mode, isPrivate, password, hostId, status: 'lobby', startAt: null, players: new Map(), spectators: new Map() };
       room.players.set(hostId, { ws, name: String(msg.name || '플레이어').slice(0, 8), ready: true, alive: true, score: 0, lines: 0, ip: ws.ip });
       rooms.set(id, room);
