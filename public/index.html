@@ -589,7 +589,7 @@
       <option value="classic2">클래식 (2인)</option>
       <option value="classic5">클래식 (5인)</option>
       <option value="territory">땅따먹기 (4인)</option>
-      <option value="defense">침공저지 (4인 협동)</option>
+      <option value="defense">몬스터 러쉬 (4인 협동)</option>
     </select>
     <label>공개 설정</label>
     <div class="mp-radio-row">
@@ -1138,19 +1138,57 @@ function startGameBgmPlayback(){
   gameBgm.play().then(()=>{ gameBgmStarted = true; }).catch(()=>{});
 }
 function updateGameBgmForScreen(id){
-  if(id === 'screen-game' && (!mpActive || mpMatchStarted)){
+  const inDefenseMatch = (id === 'screen-game' && mpActive && mpMatchStarted && mpRoomMode === 'defense');
+  if(id === 'screen-game' && (!mpActive || mpMatchStarted) && !inDefenseMatch){
     if(gameBgm.paused) startGameBgmPlayback();
   } else {
     clearTimeout(gameBgmGapTimer);
     gameBgm.pause();
   }
+  if(inDefenseMatch){
+    if(monsterRushBgm.paused) startMonsterRushBgmPlayback();
+  } else {
+    clearTimeout(monsterRushBgmGapTimer);
+    monsterRushBgm.pause();
+  }
 }
-function applyAllMusicVolumesNow(){ applyBgmVolumeNow(); applyGameBgmVolumeNow(); }
+
+// ---------- '몬스터 러쉬(defense)' 모드 전용 배경음악 ----------
+// 카운트다운이 끝나고 실제 게임이 시작될 때(startMultiplayerGame → updateGameBgmForScreen 호출 시점) 재생 시작.
+// 곡이 끝나기 BGM_FADE_SEC(3)초 전부터 페이드아웃 → 완전히 멈춘 뒤 BGM_GAP_MS(5000)ms 대기 → 처음부터 페이드인 재생, 무한 반복.
+const monsterRushBgm = new Audio('assets/audio/monster-rush.mp3');
+monsterRushBgm.loop = false;
+let monsterRushBgmGapTimer = null;
+let monsterRushBgmStarted = false;
+function applyMonsterRushBgmVolumeNow(){
+  if(!monsterRushBgm.duration || monsterRushBgm.paused){ monsterRushBgm.volume = bgmBaseVolume(); return; }
+  const remain = monsterRushBgm.duration - monsterRushBgm.currentTime;
+  if(remain <= BGM_FADE_SEC && remain > 0){
+    monsterRushBgm.volume = bgmBaseVolume() * (remain/BGM_FADE_SEC);
+  } else {
+    monsterRushBgm.volume = bgmBaseVolume();
+  }
+}
+monsterRushBgm.addEventListener('timeupdate', applyMonsterRushBgmVolumeNow);
+monsterRushBgm.addEventListener('ended', ()=>{
+  clearTimeout(monsterRushBgmGapTimer);
+  monsterRushBgmGapTimer = setTimeout(()=>{
+    if(currentActiveScreenId()==='screen-game' && mpActive && mpMatchStarted && mpRoomMode==='defense') startMonsterRushBgmPlayback();
+  }, BGM_GAP_MS);
+});
+function startMonsterRushBgmPlayback(){
+  monsterRushBgm.currentTime = 0;
+  monsterRushBgm.volume = bgmBaseVolume();
+  monsterRushBgm.play().then(()=>{ monsterRushBgmStarted = true; }).catch(()=>{});
+}
+function applyAllMusicVolumesNow(){ applyBgmVolumeNow(); applyGameBgmVolumeNow(); applyMonsterRushBgmVolumeNow(); }
 // 브라우저/Electron의 자동재생 제한 대응: 첫 클릭 시 재생 시도
 document.addEventListener('click', function firstInteractionPlay(){
   const id = currentActiveScreenId();
   if(!bgmStarted && MUSIC_SCREENS.has(id)) startBgmPlayback();
-  if(!gameBgmStarted && id==='screen-game' && (!mpActive || mpMatchStarted)) startGameBgmPlayback();
+  const inDefenseMatch = id==='screen-game' && mpActive && mpMatchStarted && mpRoomMode==='defense';
+  if(!gameBgmStarted && id==='screen-game' && (!mpActive || mpMatchStarted) && !inDefenseMatch) startGameBgmPlayback();
+  if(!monsterRushBgmStarted && inDefenseMatch) startMonsterRushBgmPlayback();
 }, { once:false });
 
 // ---------- 효과음 (틱 / 블록배치 / 줄삭제, Web Audio) ----------
@@ -1491,7 +1529,7 @@ document.getElementById('mp-refresh').addEventListener('click', mpRefreshRoomLis
 function mpModeMax(mode){ if(mode === 'classic2') return 2; if(mode === 'territory') return 4; if(mode === 'defense') return 4; if(mode === 'rest') return 4; return 5; }
 function mpModeLabel(mode){
   if(mode === 'territory') return '땅따먹기';
-  if(mode === 'defense') return '침공저지';
+  if(mode === 'defense') return '몬스터 러쉬';
   if(mode === 'rest') return 'RC';
   if(mode === 'classic2') return '클래식(2인)';
   return '클래식(5인)';
